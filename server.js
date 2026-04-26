@@ -10,47 +10,52 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static("public"));
 
-function extrairCodigo(valor) {
-  const m = String(valor || "").match(/4\d{10}/);
-  return m ? m[0] : null;
-}
+// guarda conexões
+wss.on("connection", (ws) => {
 
-function enviarParaTodos(dados) {
-  const msg = JSON.stringify(dados);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
-    }
-  });
-}
-
-wss.on("connection", ws => {
-  ws.on("message", msg => {
+  ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
 
+      // mensagem do celular
       if (data.type === "scan") {
-        const id = extrairCodigo(data.valor);
-        const rota = data.rota || "";
 
-        const resposta = {
-          type: "scan",
-          rota,
-          valorOriginal: data.valor,
-          id,
-          status: id ? "LIDO" : "INVALIDO",
-          cor: id ? "green" : "red",
-          hora: new Date().toLocaleTimeString("pt-BR")
-        };
+        // manda pro PC (painel)
+        wss.clients.forEach(client => {
+          if (client !== ws && client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+              type: "scan",
+              valorOriginal: data.valor,
+              rota: data.rota,
+              socketId: ws._socket.remotePort
+            }));
+          }
+        });
 
-        enviarParaTodos(resposta);
       }
+
+      // resposta do PC (validação)
+      if (data.type === "resultado") {
+
+        // devolve só pro celular que enviou
+        wss.clients.forEach(client => {
+          if (client._socket.remotePort == data.socketId) {
+            client.send(JSON.stringify({
+              type: "feedback",
+              cor: data.cor
+            }));
+          }
+        });
+
+      }
+
     } catch (e) {
       console.log("Erro:", e);
     }
   });
+
 });
 
 server.listen(PORT, () => {
-  console.log("Rodando na porta:", PORT);
+  console.log("Rodando:", PORT);
 });
