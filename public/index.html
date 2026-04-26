@@ -7,13 +7,11 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
     body { background:#000; color:#4ade80; font-family: Arial, sans-serif; }
     .hidden { display:none !important; }
     .fallback-box { word-break: break-all; font-size: 12px; color: #111; max-width: 180px; }
-    .scanner-only body { padding: 0; }
   </style>
 </head>
 
@@ -23,6 +21,7 @@
     <header class="bg-black border border-green-500 rounded-2xl shadow p-6">
       <h1 class="text-3xl font-bold text-green-400">Conferidor de Pacotes por Rota</h1>
       <p class="text-green-300 mt-2">Múltiplos TXT + QR da rota + validação de pacotes</p>
+      <p id="wsStatus" class="text-yellow-400 mt-2 text-sm">Conectando ao servidor...</p>
     </header>
 
     <section class="bg-black border border-green-500 rounded-2xl shadow p-6">
@@ -50,7 +49,6 @@
 
       <div class="mt-4 flex gap-4 flex-wrap">
         <button type="button" onclick="validarPacote()" class="bg-green-500 text-black px-6 py-3 rounded-xl font-bold">Validar Pacote</button>
-        <button type="button" onclick="abrirScanner()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">Abrir Câmera</button>
         <button type="button" onclick="exportarCSV()" class="bg-white text-black px-6 py-3 rounded-xl font-bold">Gerar CSV</button>
       </div>
 
@@ -76,35 +74,11 @@
     </section>
   </div>
 
-  <div id="scannerTela" class="hidden fixed inset-0 bg-black text-green-400 z-50 p-6 overflow-y-auto">
-    <div class="max-w-2xl mx-auto space-y-5">
-      <div id="scannerTopo" class="flex items-center justify-between gap-4">
-        <div>
-          <h2 class="text-2xl font-bold">Scanner de Pacotes</h2>
-          <p id="scannerRotaNome" class="text-green-300">Rota: aguardando...</p>
-        </div>
-        <button type="button" onclick="fecharScanner()" class="border border-green-500 px-4 py-2 rounded-xl text-green-300">Fechar</button>
-      </div>
-
-      <div id="reader" class="border border-green-500 rounded-2xl bg-black p-3 min-h-[280px]"></div>
-      <p id="scannerAviso" class="text-yellow-400 text-sm"></p>
-
-      <div id="scannerManualArea">
-        <input id="scannerManual" type="text" placeholder="Digitar manualmente no celular" class="w-full border border-green-500 bg-black text-green-300 rounded-xl p-4" />
-        <button type="button" onclick="validarScannerManual()" class="bg-green-500 text-black px-6 py-3 rounded-xl font-bold w-full mt-3">Bipar Manual</button>
-      </div>
-
-      <div id="scannerFeedback" class="rounded-xl border border-green-500 p-6 text-center font-bold text-xl">Aguardando leitura...</div>
-    </div>
-  </div>
-
 <script>
 'use strict';
 
 let rotas = {};
-let html5QrCode = null;
-let ultimoCodigoCamera = '';
-let ultimoTempoCamera = 0;
+let wsPainelPC = null;
 
 function byId(id) {
   return document.getElementById(id);
@@ -133,6 +107,16 @@ function escapeHtml(valor) {
     .replace(/'/g, '&#039;');
 }
 
+function criarObjetoRota(nome, ids) {
+  return {
+    nome: nome,
+    ids: new Set(ids),
+    bipados: new Set(),
+    foraDeRota: 0,
+    historico: []
+  };
+}
+
 function importarRotas() {
   const input = byId('txtFiles');
   const files = input ? input.files : [];
@@ -152,7 +136,6 @@ function importarRotas() {
       const ids = extrairIds(e.target.result);
 
       rotas[nome] = criarObjetoRota(nome, ids);
-      salvarRotasLocal();
       criarCardRota(nome);
       adicionarSelectRota(nome);
     };
@@ -163,16 +146,6 @@ function importarRotas() {
 
     reader.readAsText(file);
   });
-}
-
-function criarObjetoRota(nome, ids) {
-  return {
-    nome: nome,
-    ids: new Set(ids),
-    bipados: new Set(),
-    foraDeRota: 0,
-    historico: []
-  };
 }
 
 function limparTelaRotas() {
@@ -224,18 +197,12 @@ function gerarQrRota(nome, idSeguro) {
 
   qrBox.innerHTML = '';
 
-  // IMPORTANTE:
-  // Agora o QR da rota abre o scanner real do celular,
-  // já com o nome da rota na URL.
+  // QR correto para o celular: abre scanner.html já com a rota
   const url = `${location.origin}/scanner.html?rota=${encodeURIComponent(nome)}`;
 
   try {
     if (typeof QRCode === 'function') {
-      new QRCode(qrBox, {
-        text: url,
-        width: 180,
-        height: 180
-      });
+      new QRCode(qrBox, { text: url, width: 180, height: 180 });
     } else {
       qrBox.innerHTML = `<div class="fallback-box">QR não carregou<br>${escapeHtml(url)}</div>`;
     }
@@ -294,7 +261,7 @@ function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel) {
 
   const rota = rotas[nomeRota];
   if (!rota) {
-    alert('Rota não encontrada');
+    mostrarResultado(`❌ Rota não encontrada: ${nomeRota}`, 'red');
     return null;
   }
 
@@ -510,196 +477,66 @@ function baixarCSV() {
   URL.revokeObjectURL(url);
 }
 
-function abrirScanner() {
-  const nomeRota = byId('rotaSelecionada').value;
+function conectarPainelPC() {
+  const status = byId('wsStatus');
+  const protocolo = location.protocol === 'https:' ? 'wss://' : 'ws://';
 
-  if (!nomeRota) {
-    alert('Selecione uma rota antes de abrir a câmera');
-    return;
-  }
+  wsPainelPC = new WebSocket(protocolo + location.host);
 
-  const tela = byId('scannerTela');
-  if (tela) tela.classList.remove('hidden');
-
-  const rotaNome = byId('scannerRotaNome');
-  if (rotaNome) rotaNome.textContent = 'Rota: ' + nomeRota;
-
-  const aviso = byId('scannerAviso');
-  if (aviso) aviso.textContent = '';
-
-  iniciarCamera();
-}
-
-function iniciarCamera() {
-  const reader = byId('reader');
-
-  if (!reader) return;
-  if (html5QrCode) return;
-
-  reader.innerHTML = '';
-
-  if (typeof Html5Qrcode === 'undefined') {
-    reader.innerHTML = '<div class="text-yellow-400 p-4">Biblioteca da câmera não carregou. Use o campo manual.</div>';
-    return;
-  }
-
-  try {
-    html5QrCode = new Html5Qrcode('reader');
-  } catch (erro) {
-    html5QrCode = null;
-    reader.innerHTML = '<div class="text-yellow-400 p-4">Erro ao iniciar câmera. Use o campo manual.</div>';
-    return;
-  }
-
-  Html5Qrcode.getCameras()
-    .then(cameras => {
-      if (!cameras || cameras.length === 0) {
-        reader.innerHTML = '<div class="text-red-400 p-4">Nenhuma câmera encontrada.</div>';
-        return;
-      }
-
-      const cameraId = cameras[cameras.length - 1].id;
-
-      return html5QrCode.start(
-        cameraId,
-        { fps: 8, qrbox: { width: 250, height: 250 } },
-        textoLido => tratarLeituraCamera(textoLido),
-        () => {}
-      );
-    })
-    .catch(err => {
-      console.error(err);
-      reader.innerHTML = '<div class="text-red-400 p-4">Erro ao acessar câmera. Permita a câmera ou use Chrome.</div>';
-    });
-}
-
-function tratarLeituraCamera(textoLido) {
-  const agora = Date.now();
-
-  if (textoLido === ultimoCodigoCamera && agora - ultimoTempoCamera < 1500) return;
-
-  ultimoCodigoCamera = textoLido;
-  ultimoTempoCamera = agora;
-
-  const nomeRota = byId('rotaSelecionada').value;
-  const resultado = processarBipagem(nomeRota, textoLido, false);
-  mostrarFeedbackResultado(resultado);
-}
-
-function validarScannerManual() {
-  const campo = byId('scannerManual');
-  const valor = campo ? campo.value.trim() : '';
-  const nomeRota = byId('rotaSelecionada').value;
-  const resultado = processarBipagem(nomeRota, valor, false);
-
-  mostrarFeedbackResultado(resultado);
-
-  if (campo) campo.value = '';
-}
-
-function mostrarFeedbackResultado(resultado) {
-  if (!resultado) return;
-
-  if (resultado.status === 'VÁLIDO') {
-    feedbackScanner('green', `✅ OK: ${resultado.id}`);
-  } else if (resultado.status === 'DUPLICADO') {
-    feedbackScanner('yellow', `⚠ Duplicado: ${resultado.id}`);
-  } else if (resultado.status === 'FORA DE ROTA') {
-    feedbackScanner('red', `❌ Fora de rota: ${resultado.id}`);
-  } else {
-    feedbackScanner('red', '❌ Inválido');
-  }
-}
-
-function feedbackScanner(tipo, texto) {
-  const box = byId('scannerFeedback');
-  if (!box) return;
-
-  const resetar = function() {
-    box.className = 'rounded-xl border border-green-500 p-6 text-center font-bold text-xl';
-    box.textContent = 'Aguardando leitura...';
+  wsPainelPC.onopen = function() {
+    console.log('✅ Painel PC conectado ao WebSocket');
+    if (status) {
+      status.textContent = 'Painel conectado ao servidor';
+      status.className = 'text-green-400 mt-2 text-sm';
+    }
   };
 
-  box.textContent = texto;
+  wsPainelPC.onmessage = function(event) {
+    let data;
 
-  if (tipo === 'green') {
-    box.className = 'rounded-xl p-6 text-center font-bold text-xl bg-green-500 text-black';
-    setTimeout(resetar, 350);
-  } else if (tipo === 'yellow') {
-    box.className = 'rounded-xl p-6 text-center font-bold text-xl bg-yellow-400 text-black';
-    setTimeout(resetar, 1000);
-  } else if (tipo === 'red') {
-    box.className = 'rounded-xl p-6 text-center font-bold text-xl bg-red-600 text-white';
-    setTimeout(resetar, 2000);
-  }
-}
-
-function fecharScanner() {
-  const tela = byId('scannerTela');
-
-  if (html5QrCode && typeof html5QrCode.stop === 'function') {
-    html5QrCode.stop()
-      .then(function() {
-        if (html5QrCode && typeof html5QrCode.clear === 'function') html5QrCode.clear();
-        html5QrCode = null;
-      })
-      .catch(function() {
-        html5QrCode = null;
-      });
-  }
-
-  if (tela) tela.classList.add('hidden');
-}
-
-function salvarRotasLocal() {
-  const obj = {};
-  Object.keys(rotas).forEach(nome => {
-    obj[nome] = {
-      nome: nome,
-      ids: Array.from(rotas[nome].ids)
-    };
-  });
-  localStorage.setItem('rotas', JSON.stringify(obj));
-}
-
-function carregarRotasLocal() {
-  const dados = localStorage.getItem('rotas');
-  if (!dados) return;
-
-  try {
-    const obj = JSON.parse(dados);
-    byId('rotasContainer').innerHTML = '';
-    byId('rotaSelecionada').innerHTML = '<option value="">Selecione uma rota</option>';
-
-    Object.keys(obj).forEach(nome => {
-      rotas[nome] = criarObjetoRota(nome, obj[nome].ids || []);
-      criarCardRota(nome);
-      adicionarSelectRota(nome);
-    });
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-function abrirScannerPorParametro() {
-  const params = new URLSearchParams(window.location.search);
-  const modoScanner = params.get('scanner');
-  const rota = params.get('rota');
-
-  if (modoScanner !== '1' || !rota) return;
-
-  const app = byId('appPrincipal');
-  if (app) app.classList.add('hidden');
-
-  setTimeout(function() {
-    if (rotas[rota]) {
-      byId('rotaSelecionada').value = rota;
-      abrirScanner();
-    } else {
-      alert('Rota não encontrada neste aparelho. Para multi-celular real, use a versão com server.js/WebSocket.');
-      if (app) app.classList.remove('hidden');
+    try {
+      data = JSON.parse(event.data);
+    } catch (e) {
+      console.warn('Mensagem inválida:', event.data);
+      return;
     }
-  }, 300);
+
+    if (data.type !== 'scan') return;
+
+    console.log('📦 Bipagem recebida no PC:', data);
+
+    let rota = data.rota || '';
+    const codigo = data.valorOriginal || data.id || '';
+
+    if (!rota) {
+      const select = byId('rotaSelecionada');
+      rota = select ? select.value : '';
+    }
+
+    if (!rota || !codigo) {
+      console.warn('Sem rota ou sem código:', data);
+      return;
+    }
+
+    processarBipagem(rota, codigo, true);
+  };
+
+  wsPainelPC.onerror = function(err) {
+    console.warn('Erro WebSocket PC:', err);
+    if (status) {
+      status.textContent = 'Erro na conexão com servidor';
+      status.className = 'text-red-400 mt-2 text-sm';
+    }
+  };
+
+  wsPainelPC.onclose = function() {
+    console.warn('PC desconectado. Reconectando...');
+    if (status) {
+      status.textContent = 'Reconectando ao servidor...';
+      status.className = 'text-yellow-400 mt-2 text-sm';
+    }
+    setTimeout(conectarPainelPC, 1000);
+  };
 }
 
 function rodarTestesBasicos() {
@@ -713,8 +550,7 @@ function rodarTestesBasicos() {
 
 window.addEventListener('DOMContentLoaded', function() {
   rodarTestesBasicos();
-  carregarRotasLocal();
-  abrirScannerPorParametro();
+  conectarPainelPC();
 });
 </script>
 </body>
