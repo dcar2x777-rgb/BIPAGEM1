@@ -1,7 +1,713 @@
 <!DOCTYPE html>
-<html>
-<body style="background:black;color:lime;font-family:Arial">
-<h1>PC ONLINE</h1>
-<p>Use o celular para bipar</p>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conferidor de Pacotes por Rota</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body { background:#000; color:#4ade80; font-family: Arial, sans-serif; }
+    .hidden { display:none !important; }
+    .fallback-box { word-break: break-all; font-size: 12px; color: #111; max-width: 180px; }
+    .scanner-only body { padding: 0; }
+  </style>
+</head>
+
+<body class="bg-black text-green-400 min-h-screen p-6">
+  <div id="appPrincipal" class="max-w-7xl mx-auto space-y-6">
+
+    <header class="bg-black border border-green-500 rounded-2xl shadow p-6">
+      <h1 class="text-3xl font-bold text-green-400">Conferidor de Pacotes por Rota</h1>
+      <p class="text-green-300 mt-2">Múltiplos TXT + QR da rota + validação de pacotes</p>
+    </header>
+
+    <section class="bg-black border border-green-500 rounded-2xl shadow p-6">
+      <div class="flex flex-col md:flex-row gap-4 items-start md:items-center">
+        <input id="txtFiles" type="file" accept=".txt" multiple class="border border-green-500 bg-black text-green-300 rounded-xl p-3 w-full" />
+        <button type="button" onclick="importarRotas()" class="bg-green-500 text-black px-6 py-3 rounded-xl font-bold">Importar Rotas</button>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold mb-4 text-green-400">Rotas Carregadas</h2>
+      <div id="rotasContainer" class="grid md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </section>
+
+    <section class="bg-black border border-green-500 rounded-2xl shadow p-6">
+      <h2 class="text-xl font-bold mb-4 text-green-400">Bipagem Manual / Teste</h2>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <select id="rotaSelecionada" class="border border-green-500 bg-black text-green-300 rounded-xl p-3">
+          <option value="">Selecione uma rota</option>
+        </select>
+
+        <input id="codigoManual" type="text" placeholder="Cole QR / Código de barras / Digite manualmente" class="border border-green-500 bg-black text-green-300 rounded-xl p-3" />
+      </div>
+
+      <div class="mt-4 flex gap-4 flex-wrap">
+        <button type="button" onclick="validarPacote()" class="bg-green-500 text-black px-6 py-3 rounded-xl font-bold">Validar Pacote</button>
+        <button type="button" onclick="abrirScanner()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">Abrir Câmera</button>
+        <button type="button" onclick="exportarCSV()" class="bg-white text-black px-6 py-3 rounded-xl font-bold">Gerar CSV</button>
+      </div>
+
+      <div id="resultado" class="mt-4 rounded-xl border border-green-500 p-4 bg-black text-green-300 font-bold">Aguardando leitura...</div>
+
+      <div id="painelExportacao" class="hidden mt-4 border border-green-500 rounded-xl p-4 bg-black">
+        <div class="flex items-center justify-between gap-4 flex-wrap mb-4">
+          <h3 class="text-lg font-bold text-green-400">Conferência para Exportar CSV</h3>
+          <button type="button" onclick="fecharPainelExportacao()" class="border border-green-500 px-4 py-2 rounded-xl text-green-300">Fechar</button>
+        </div>
+
+        <div id="resumoExportacao" class="mb-4 text-green-300 font-bold"></div>
+        <p class="text-sm text-green-300 mb-2">Marque os códigos que você quer excluir antes de baixar.</p>
+        <div id="listaExportacaoCompleta" class="border border-green-500 rounded-xl p-3 max-h-96 overflow-y-auto text-sm"></div>
+
+        <button type="button" onclick="baixarCSV()" class="mt-4 bg-white text-black px-6 py-3 rounded-xl font-bold">Baixar CSV Final</button>
+      </div>
+    </section>
+
+    <section class="bg-black border border-green-500 rounded-2xl shadow p-6">
+      <h2 class="text-xl font-bold mb-4 text-green-400">Histórico Geral</h2>
+      <div id="historico" class="space-y-2 text-sm text-green-300"></div>
+    </section>
+  </div>
+
+  <div id="scannerTela" class="hidden fixed inset-0 bg-black text-green-400 z-50 p-6 overflow-y-auto">
+    <div class="max-w-2xl mx-auto space-y-5">
+      <div id="scannerTopo" class="flex items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold">Scanner de Pacotes</h2>
+          <p id="scannerRotaNome" class="text-green-300">Rota: aguardando...</p>
+        </div>
+        <button type="button" onclick="fecharScanner()" class="border border-green-500 px-4 py-2 rounded-xl text-green-300">Fechar</button>
+      </div>
+
+      <div id="reader" class="border border-green-500 rounded-2xl bg-black p-3 min-h-[280px]"></div>
+      <p id="scannerAviso" class="text-yellow-400 text-sm"></p>
+
+      <div id="scannerManualArea">
+        <input id="scannerManual" type="text" placeholder="Digitar manualmente no celular" class="w-full border border-green-500 bg-black text-green-300 rounded-xl p-4" />
+        <button type="button" onclick="validarScannerManual()" class="bg-green-500 text-black px-6 py-3 rounded-xl font-bold w-full mt-3">Bipar Manual</button>
+      </div>
+
+      <div id="scannerFeedback" class="rounded-xl border border-green-500 p-6 text-center font-bold text-xl">Aguardando leitura...</div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+let rotas = {};
+let html5QrCode = null;
+let ultimoCodigoCamera = '';
+let ultimoTempoCamera = 0;
+
+function byId(id) {
+  return document.getElementById(id);
+}
+
+function extrairIds(texto) {
+  const encontrados = String(texto || '').match(/4\d{10}/g) || [];
+  return Array.from(new Set(encontrados));
+}
+
+function extrairCodigo(valor) {
+  const match = String(valor || '').match(/4\d{10}/);
+  return match ? match[0] : null;
+}
+
+function safeId(nome) {
+  return String(nome).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function escapeHtml(valor) {
+  return String(valor)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function importarRotas() {
+  const input = byId('txtFiles');
+  const files = input ? input.files : [];
+
+  if (!files || !files.length) {
+    alert('Selecione um ou mais arquivos TXT');
+    return;
+  }
+
+  limparTelaRotas();
+
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+      const nome = file.name.replace(/\.txt$/i, '');
+      const ids = extrairIds(e.target.result);
+
+      rotas[nome] = criarObjetoRota(nome, ids);
+      salvarRotasLocal();
+      criarCardRota(nome);
+      adicionarSelectRota(nome);
+    };
+
+    reader.onerror = function() {
+      alert('Erro ao ler o arquivo: ' + file.name);
+    };
+
+    reader.readAsText(file);
+  });
+}
+
+function criarObjetoRota(nome, ids) {
+  return {
+    nome: nome,
+    ids: new Set(ids),
+    bipados: new Set(),
+    foraDeRota: 0,
+    historico: []
+  };
+}
+
+function limparTelaRotas() {
+  rotas = {};
+  byId('rotasContainer').innerHTML = '';
+  byId('rotaSelecionada').innerHTML = '<option value="">Selecione uma rota</option>';
+  byId('historico').innerHTML = '';
+  byId('painelExportacao').classList.add('hidden');
+  mostrarResultado('Aguardando leitura...', 'normal');
+}
+
+function criarCardRota(nome) {
+  const rota = rotas[nome];
+  const container = byId('rotasContainer');
+  const idSeguro = safeId(nome);
+
+  if (!rota || !container) return;
+
+  const card = document.createElement('div');
+  card.className = 'bg-black rounded-2xl shadow p-5 border border-green-500';
+  card.id = `card-${idSeguro}`;
+
+  card.innerHTML = `
+    <h3 class="text-lg font-bold text-green-400">${escapeHtml(nome)}</h3>
+    <p>IDs válidos: ${rota.ids.size}</p>
+    <p>Bipados: <span id="bipados-${idSeguro}">0</span></p>
+    <p class="text-red-500 font-bold">Fora de rota: <span id="fora-${idSeguro}">0</span></p>
+    <p>Faltantes: <span id="faltantes-${idSeguro}">${rota.ids.size}</span></p>
+
+    <div class="mt-4">
+      <p class="font-medium mb-2">QR da rota</p>
+      <div id="qr-${idSeguro}" class="bg-white p-3 rounded-xl border min-h-[220px] flex items-center justify-center"></div>
+    </div>
+
+    <div class="mt-4">
+      <p class="font-medium mb-2">IDs Faltantes da Rota</p>
+      <div id="ids-${idSeguro}" class="border border-green-500 rounded-xl p-3 min-h-[180px] max-h-[260px] overflow-y-auto text-sm bg-black text-green-300"></div>
+    </div>
+  `;
+
+  container.appendChild(card);
+  atualizarIdsNoCard(nome);
+  gerarQrRota(nome, idSeguro);
+}
+
+function gerarQrRota(nome, idSeguro) {
+  const qrBox = byId(`qr-${idSeguro}`);
+  if (!qrBox) return;
+
+  qrBox.innerHTML = '';
+  const url = `${location.origin}${location.pathname}?scanner=1&rota=${encodeURIComponent(nome)}`;
+
+  try {
+    if (typeof QRCode === 'function') {
+      new QRCode(qrBox, { text: url, width: 180, height: 180 });
+    } else {
+      qrBox.innerHTML = `<div class="fallback-box">QR não carregou<br>${escapeHtml(url)}</div>`;
+    }
+  } catch (erro) {
+    console.error('Erro QR:', erro);
+    qrBox.innerHTML = `<div class="fallback-box">Erro QR<br>${escapeHtml(url)}</div>`;
+  }
+}
+
+function atualizarIdsNoCard(nome) {
+  const rota = rotas[nome];
+  if (!rota) return;
+
+  const idSeguro = safeId(nome);
+  const idsBox = byId(`ids-${idSeguro}`);
+  if (!idsBox) return;
+
+  const faltantes = Array.from(rota.ids).filter(id => !rota.bipados.has(id));
+
+  if (!faltantes.length) {
+    idsBox.innerHTML = '<div>✅ Todos os pacotes foram bipados</div>';
+    return;
+  }
+
+  idsBox.innerHTML = faltantes.map(id => `<div>${escapeHtml(id)}</div>`).join('');
+}
+
+function adicionarSelectRota(nome) {
+  const select = byId('rotaSelecionada');
+  if (!select) return;
+
+  const option = document.createElement('option');
+  option.value = nome;
+  option.textContent = nome;
+  select.appendChild(option);
+}
+
+function validarPacote() {
+  const nomeRota = byId('rotaSelecionada').value;
+  const valorOriginal = byId('codigoManual').value.trim();
+  const resultado = processarBipagem(nomeRota, valorOriginal, true);
+
+  if (resultado) limparCampo();
+}
+
+function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel) {
+  if (!nomeRota) {
+    alert('Selecione uma rota');
+    return null;
+  }
+
+  if (!valorOriginal) {
+    alert('Digite ou cole um código');
+    return null;
+  }
+
+  const rota = rotas[nomeRota];
+  if (!rota) {
+    alert('Rota não encontrada');
+    return null;
+  }
+
+  const id = extrairCodigo(valorOriginal);
+
+  if (!id) {
+    if (mostrarNoPainel) mostrarResultado('❌ Inválido', 'red');
+    registrar(nomeRota, '❌', 'INVÁLIDO', valorOriginal);
+    return { status: 'INVÁLIDO', id: valorOriginal };
+  }
+
+  if (!rota.ids.has(id)) {
+    rota.foraDeRota += 1;
+    atualizar(nomeRota);
+    if (mostrarNoPainel) mostrarResultado(`❌ Fora de rota: ${id}`, 'red');
+    registrar(nomeRota, '❌', 'FORA DE ROTA', id);
+    return { status: 'FORA DE ROTA', id: id };
+  }
+
+  if (rota.bipados.has(id)) {
+    if (mostrarNoPainel) mostrarResultado(`⚠ Duplicado: ${id}`, 'yellow');
+    registrar(nomeRota, '⚠', 'DUPLICADO', id);
+    return { status: 'DUPLICADO', id: id };
+  }
+
+  rota.bipados.add(id);
+  atualizar(nomeRota);
+  if (mostrarNoPainel) mostrarResultado(`✅ OK: ${id}`, 'green');
+  registrar(nomeRota, '✅', 'VÁLIDO', id);
+  return { status: 'VÁLIDO', id: id };
+}
+
+function atualizar(nome) {
+  const rota = rotas[nome];
+  if (!rota) return;
+
+  const idSeguro = safeId(nome);
+  const bipados = byId(`bipados-${idSeguro}`);
+  const fora = byId(`fora-${idSeguro}`);
+  const faltantes = byId(`faltantes-${idSeguro}`);
+
+  if (bipados) bipados.textContent = rota.bipados.size;
+  if (fora) fora.textContent = rota.foraDeRota;
+  if (faltantes) faltantes.textContent = rota.ids.size - rota.bipados.size;
+
+  atualizarIdsNoCard(nome);
+}
+
+function mostrarResultado(texto, cor) {
+  const box = byId('resultado');
+  if (!box) return;
+
+  const classes = {
+    normal: 'bg-black text-green-300 border-green-500',
+    green: 'bg-green-500 text-black border-green-500',
+    yellow: 'bg-yellow-400 text-black border-yellow-400',
+    red: 'bg-red-600 text-white border-red-600'
+  };
+
+  box.className = `mt-4 rounded-xl border p-4 font-bold ${classes[cor] || classes.normal}`;
+  box.textContent = texto;
+}
+
+function registrar(nomeRota, simbolo, status, id) {
+  const hora = new Date().toLocaleTimeString('pt-BR');
+  const linha = `${hora} | ${nomeRota} | ${simbolo} ${id} | ${status}`;
+  const historico = byId('historico');
+
+  if (historico) {
+    historico.innerHTML = `<div>${escapeHtml(linha)}</div>` + historico.innerHTML;
+  }
+
+  if (rotas[nomeRota]) {
+    rotas[nomeRota].historico.push({
+      hora: hora,
+      status: status,
+      id: String(id),
+      excluir: false
+    });
+  }
+}
+
+function limparCampo() {
+  const campo = byId('codigoManual');
+  if (!campo) return;
+  campo.value = '';
+  campo.focus();
+}
+
+function exportarCSV() {
+  const nomeRota = byId('rotaSelecionada').value;
+
+  if (!nomeRota) {
+    alert('Selecione uma rota antes de gerar o CSV');
+    return;
+  }
+
+  abrirPainelExportacao(nomeRota);
+}
+
+function abrirPainelExportacao(nomeRota) {
+  const rota = rotas[nomeRota];
+  const painel = byId('painelExportacao');
+  const resumo = byId('resumoExportacao');
+  const lista = byId('listaExportacaoCompleta');
+
+  if (!rota || !painel || !resumo || !lista) return;
+
+  painel.dataset.rota = nomeRota;
+  painel.classList.remove('hidden');
+
+  const faltantes = Array.from(rota.ids).filter(id => !rota.bipados.has(id));
+  const validos = rota.historico.filter(item => item.status === 'VÁLIDO').length;
+  const duplicados = rota.historico.filter(item => item.status === 'DUPLICADO').length;
+  const fora = rota.historico.filter(item => item.status === 'FORA DE ROTA').length;
+  const invalidos = rota.historico.filter(item => item.status === 'INVÁLIDO').length;
+
+  resumo.textContent = `Rota: ${rota.nome} | Leituras: ${rota.historico.length} | Válidos: ${validos} | Duplicados: ${duplicados} | Fora de rota: ${fora} | Inválidos: ${invalidos} | Faltantes: ${faltantes.length}`;
+
+  if (!rota.historico.length) {
+    lista.innerHTML = '<div class="text-yellow-400">Nenhuma bipagem feita nessa rota.</div>';
+    return;
+  }
+
+  lista.innerHTML = rota.historico.map((item, index) => {
+    let cor = 'text-green-300 border-green-900';
+    let marcador = '✅';
+
+    if (item.status === 'DUPLICADO') {
+      cor = 'text-yellow-400 border-yellow-700';
+      marcador = '⚠';
+    }
+
+    if (item.status === 'FORA DE ROTA' || item.status === 'INVÁLIDO') {
+      cor = 'text-red-500 border-red-700';
+      marcador = '❌';
+    }
+
+    const checked = item.excluir ? 'checked' : '';
+    const itemId = escapeHtml(item.id);
+    const itemHora = escapeHtml(item.hora);
+    const itemStatus = escapeHtml(item.status);
+
+    return `
+      <div class="flex items-center justify-between gap-3 border-b py-2 ${cor}">
+        <div>
+          <div><strong>${marcador} ${itemId}</strong></div>
+          <div class="text-xs">${itemHora} | ${itemStatus}</div>
+        </div>
+        <label class="flex items-center gap-2 text-xs cursor-pointer">
+          <input type="checkbox" ${checked} onchange="marcarExcluirExportacao(${index}, this.checked)">
+          Excluir
+        </label>
+      </div>
+    `;
+  }).join('');
+}
+
+function marcarExcluirExportacao(index, marcado) {
+  const painel = byId('painelExportacao');
+  const nomeRota = painel ? painel.dataset.rota : '';
+  const rota = rotas[nomeRota];
+
+  if (!rota || !rota.historico[index]) return;
+  rota.historico[index].excluir = Boolean(marcado);
+}
+
+function fecharPainelExportacao() {
+  const painel = byId('painelExportacao');
+  if (painel) painel.classList.add('hidden');
+}
+
+function baixarCSV() {
+  const painel = byId('painelExportacao');
+  const nomeRota = painel ? painel.dataset.rota : '';
+  const rota = rotas[nomeRota];
+
+  if (!rota) return;
+
+  const itens = rota.historico.filter(item => !item.excluir);
+
+  if (!itens.length) {
+    alert('Nenhum código selecionado para exportar');
+    return;
+  }
+
+  const now = new Date();
+  const linhas = ['date,time,time_zone,format,text,notes,favorite,date_utc,time_utc,metadata'];
+
+  itens.forEach((item, i) => {
+    const t = new Date(now.getTime() + i * 1000);
+    const date = t.toISOString().slice(0, 10);
+    const time = t.toTimeString().slice(0, 8);
+    const utc = new Date(t.getTime() + 3 * 3600000);
+    const dateUtc = utc.toISOString().slice(0, 10);
+    const timeUtc = utc.toTimeString().slice(0, 8);
+    const codigo = String(item.id).replace(/"/g, '""');
+    const format = String(item.id).startsWith('{') ? 'QR_CODE' : 'CODE_128';
+
+    linhas.push(`${date},${time},-03:00,${format},"${codigo}",,false,${dateUtc},${timeUtc},`);
+  });
+
+  const csv = linhas.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+
+  a.href = url;
+  a.download = `${safeId(rota.nome)}_codes_android.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function abrirScanner() {
+  const nomeRota = byId('rotaSelecionada').value;
+
+  if (!nomeRota) {
+    alert('Selecione uma rota antes de abrir a câmera');
+    return;
+  }
+
+  const tela = byId('scannerTela');
+  if (tela) tela.classList.remove('hidden');
+
+  const rotaNome = byId('scannerRotaNome');
+  if (rotaNome) rotaNome.textContent = 'Rota: ' + nomeRota;
+
+  const aviso = byId('scannerAviso');
+  if (aviso) aviso.textContent = '';
+
+  iniciarCamera();
+}
+
+function iniciarCamera() {
+  const reader = byId('reader');
+
+  if (!reader) return;
+  if (html5QrCode) return;
+
+  reader.innerHTML = '';
+
+  if (typeof Html5Qrcode === 'undefined') {
+    reader.innerHTML = '<div class="text-yellow-400 p-4">Biblioteca da câmera não carregou. Use o campo manual.</div>';
+    return;
+  }
+
+  try {
+    html5QrCode = new Html5Qrcode('reader');
+  } catch (erro) {
+    html5QrCode = null;
+    reader.innerHTML = '<div class="text-yellow-400 p-4">Erro ao iniciar câmera. Use o campo manual.</div>';
+    return;
+  }
+
+  Html5Qrcode.getCameras()
+    .then(cameras => {
+      if (!cameras || cameras.length === 0) {
+        reader.innerHTML = '<div class="text-red-400 p-4">Nenhuma câmera encontrada.</div>';
+        return;
+      }
+
+      const cameraId = cameras[cameras.length - 1].id;
+
+      return html5QrCode.start(
+        cameraId,
+        { fps: 8, qrbox: { width: 250, height: 250 } },
+        textoLido => tratarLeituraCamera(textoLido),
+        () => {}
+      );
+    })
+    .catch(err => {
+      console.error(err);
+      reader.innerHTML = '<div class="text-red-400 p-4">Erro ao acessar câmera. Permita a câmera ou use Chrome.</div>';
+    });
+}
+
+function tratarLeituraCamera(textoLido) {
+  const agora = Date.now();
+
+  if (textoLido === ultimoCodigoCamera && agora - ultimoTempoCamera < 1500) return;
+
+  ultimoCodigoCamera = textoLido;
+  ultimoTempoCamera = agora;
+
+  const nomeRota = byId('rotaSelecionada').value;
+  const resultado = processarBipagem(nomeRota, textoLido, false);
+  mostrarFeedbackResultado(resultado);
+}
+
+function validarScannerManual() {
+  const campo = byId('scannerManual');
+  const valor = campo ? campo.value.trim() : '';
+  const nomeRota = byId('rotaSelecionada').value;
+  const resultado = processarBipagem(nomeRota, valor, false);
+
+  mostrarFeedbackResultado(resultado);
+
+  if (campo) campo.value = '';
+}
+
+function mostrarFeedbackResultado(resultado) {
+  if (!resultado) return;
+
+  if (resultado.status === 'VÁLIDO') {
+    feedbackScanner('green', `✅ OK: ${resultado.id}`);
+  } else if (resultado.status === 'DUPLICADO') {
+    feedbackScanner('yellow', `⚠ Duplicado: ${resultado.id}`);
+  } else if (resultado.status === 'FORA DE ROTA') {
+    feedbackScanner('red', `❌ Fora de rota: ${resultado.id}`);
+  } else {
+    feedbackScanner('red', '❌ Inválido');
+  }
+}
+
+function feedbackScanner(tipo, texto) {
+  const box = byId('scannerFeedback');
+  if (!box) return;
+
+  const resetar = function() {
+    box.className = 'rounded-xl border border-green-500 p-6 text-center font-bold text-xl';
+    box.textContent = 'Aguardando leitura...';
+  };
+
+  box.textContent = texto;
+
+  if (tipo === 'green') {
+    box.className = 'rounded-xl p-6 text-center font-bold text-xl bg-green-500 text-black';
+    setTimeout(resetar, 350);
+  } else if (tipo === 'yellow') {
+    box.className = 'rounded-xl p-6 text-center font-bold text-xl bg-yellow-400 text-black';
+    setTimeout(resetar, 1000);
+  } else if (tipo === 'red') {
+    box.className = 'rounded-xl p-6 text-center font-bold text-xl bg-red-600 text-white';
+    setTimeout(resetar, 2000);
+  }
+}
+
+function fecharScanner() {
+  const tela = byId('scannerTela');
+
+  if (html5QrCode && typeof html5QrCode.stop === 'function') {
+    html5QrCode.stop()
+      .then(function() {
+        if (html5QrCode && typeof html5QrCode.clear === 'function') html5QrCode.clear();
+        html5QrCode = null;
+      })
+      .catch(function() {
+        html5QrCode = null;
+      });
+  }
+
+  if (tela) tela.classList.add('hidden');
+}
+
+function salvarRotasLocal() {
+  const obj = {};
+  Object.keys(rotas).forEach(nome => {
+    obj[nome] = {
+      nome: nome,
+      ids: Array.from(rotas[nome].ids)
+    };
+  });
+  localStorage.setItem('rotas', JSON.stringify(obj));
+}
+
+function carregarRotasLocal() {
+  const dados = localStorage.getItem('rotas');
+  if (!dados) return;
+
+  try {
+    const obj = JSON.parse(dados);
+    byId('rotasContainer').innerHTML = '';
+    byId('rotaSelecionada').innerHTML = '<option value="">Selecione uma rota</option>';
+
+    Object.keys(obj).forEach(nome => {
+      rotas[nome] = criarObjetoRota(nome, obj[nome].ids || []);
+      criarCardRota(nome);
+      adicionarSelectRota(nome);
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function abrirScannerPorParametro() {
+  const params = new URLSearchParams(window.location.search);
+  const modoScanner = params.get('scanner');
+  const rota = params.get('rota');
+
+  if (modoScanner !== '1' || !rota) return;
+
+  const app = byId('appPrincipal');
+  if (app) app.classList.add('hidden');
+
+  setTimeout(function() {
+    if (rotas[rota]) {
+      byId('rotaSelecionada').value = rota;
+      abrirScanner();
+    } else {
+      alert('Rota não encontrada neste aparelho. Para multi-celular real, use a versão com server.js/WebSocket.');
+      if (app) app.classList.remove('hidden');
+    }
+  }, 300);
+}
+
+function rodarTestesBasicos() {
+  console.assert(extrairCodigo('ABC41234567890XYZ') === '41234567890', 'Teste extrairCodigo com texto');
+  console.assert(extrairCodigo('12345678901') === null, 'Teste deve ignorar número que não começa com 4');
+  console.assert(extrairIds('41234567890 41234567890 49876543210').length === 2, 'Teste extrairIds remove duplicados');
+
+  const teste = criarObjetoRota('TESTE', ['41234567890']);
+  console.assert(teste.ids.has('41234567890'), 'Teste criarObjetoRota cria Set de ids');
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  rodarTestesBasicos();
+  carregarRotasLocal();
+  abrirScannerPorParametro();
+});
+</script>
 </body>
-</html> 
+</html>
