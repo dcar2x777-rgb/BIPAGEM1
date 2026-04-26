@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body{
+  margin:0;
+  background:black;
+  color:lime;
+  font-family:Arial;
+}
+#reader{
+  width:100vw;
+  height:100vh;
+}
+#status{
+  position:fixed;
+  top:10px;
+  left:10px;
+  background:black;
+  padding:10px;
+  border:1px solid lime;
+  font-size:14px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="status">Iniciando...</div>
+<div id="reader"></div>
+
+<script>
+const statusBox = document.getElementById("status");
+
+function status(msg){
+  statusBox.innerText = msg;
+}
+
+// 🔥 CORREÇÃO DO WEBSOCKET (FUNCIONA EM HTTPS)
+let protocolo = location.protocol === "https:" ? "wss://" : "ws://";
+let ws = new WebSocket(protocolo + location.host);
+
+ws.onopen = () => {
+  status("Conectado ao PC. Abrindo câmera...");
+  iniciarCamera();
+};
+
+ws.onerror = () => {
+  status("Erro WebSocket (PC não conectou)");
+};
+
+ws.onmessage = e => {
+  const cor = JSON.parse(e.data).cor;
+  document.body.style.background = cor;
+  setTimeout(()=>document.body.style.background="black",300);
+};
+
+function iniciarCamera(){
+  if (typeof Html5Qrcode === "undefined") {
+    status("Erro: biblioteca não carregou");
+    return;
+  }
+
+  Html5Qrcode.getCameras().then(cameras => {
+
+    if (!cameras.length) {
+      status("Nenhuma câmera encontrada");
+      return;
+    }
+
+    const cameraId = cameras[cameras.length - 1].id;
+
+    const qr = new Html5Qrcode("reader");
+
+    qr.start(
+      cameraId,
+      { fps: 8, qrbox: { width: 250, height: 250 } },
+      txt => {
+        status("Lido: " + txt);
+        ws.send(JSON.stringify({type:"scan", valor:txt}));
+      },
+      err => {}
+    ).catch(err => {
+      status("Erro câmera: " + err);
+    });
+
+  }).catch(err => {
+    status("Permissão bloqueada: " + err);
+  });
+}
+</script>
+
+</body>
+</html>
