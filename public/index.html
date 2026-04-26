@@ -708,6 +708,58 @@ window.addEventListener('DOMContentLoaded', function() {
   carregarRotasLocal();
   abrirScannerPorParametro();
 });
+ // RECEBER BIPAGENS DOS CELULARES
+let wsPainelPC = null;
+
+function conectarPainelPC() {
+  const protocolo = location.protocol === "https:" ? "wss://" : "ws://";
+  wsPainelPC = new WebSocket(protocolo + location.host);
+
+  wsPainelPC.onopen = () => {
+    console.log("Painel PC conectado");
+  };
+
+  wsPainelPC.onmessage = (event) => {
+    let data;
+
+    try {
+      data = JSON.parse(event.data);
+    } catch (e) {
+      console.warn("Erro ao parsear mensagem", e);
+      return;
+    }
+
+    if (data.type !== "scan") return;
+
+    const rota = data.rota || (document.getElementById("rotaSelecionada")?.value);
+    const codigo = data.valorOriginal || data.id;
+
+    if (!rota || !codigo) {
+      console.warn("Dados inválidos:", data);
+      return;
+    }
+
+    // usa seu sistema original
+    if (typeof processarBipagem === "function") {
+      processarBipagem(rota, codigo, true);
+    } else if (typeof validarPacoteRecebido === "function") {
+      validarPacoteRecebido(rota, codigo);
+    } else {
+      console.warn("Função de validação não encontrada");
+    }
+  };
+
+  wsPainelPC.onerror = (err) => {
+    console.warn("Erro WebSocket:", err);
+  };
+
+  wsPainelPC.onclose = () => {
+    setTimeout(conectarPainelPC, 1000);
+  };
+}
+
+// ativa conexão quando abrir página
+window.addEventListener("DOMContentLoaded", conectarPainelPC);
 </script>
 </body>
 </html>
