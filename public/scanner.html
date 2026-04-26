@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -13,66 +13,114 @@ body{
 }
 #reader{
   width:100vw;
-  height:100vh;
+  height:75vh;
+}
+#manualArea{
+  padding:10px;
+}
+input{
+  width:100%;
+  box-sizing:border-box;
+  padding:14px;
+  font-size:20px;
+  background:#000;
+  color:lime;
+  border:2px solid lime;
+  border-radius:10px;
+}
+button{
+  width:100%;
+  margin-top:8px;
+  padding:14px;
+  font-size:20px;
+  font-weight:bold;
+  background:lime;
+  color:black;
+  border:0;
+  border-radius:10px;
 }
 #status{
-  position:fixed;
-  top:10px;
-  left:10px;
-  background:black;
-  padding:10px;
-  border:1px solid lime;
+  padding:8px;
   font-size:14px;
+  color:yellow;
 }
 </style>
 </head>
 
 <body>
 
-<div id="status">Iniciando...</div>
 <div id="reader"></div>
 
+<div id="manualArea">
+  <input id="manualInput" placeholder="Digitar ID manualmente">
+  <button onclick="enviarManual()">ENVIAR</button>
+  <div id="status">Iniciando...</div>
+</div>
+
 <script>
+const params = new URLSearchParams(location.search);
+const rota = params.get("rota") || "";
+
 const statusBox = document.getElementById("status");
 
 function status(msg){
   statusBox.innerText = msg;
 }
 
-// 🔥 CORREÇÃO DO WEBSOCKET (FUNCIONA EM HTTPS)
 let protocolo = location.protocol === "https:" ? "wss://" : "ws://";
 let ws = new WebSocket(protocolo + location.host);
 
 ws.onopen = () => {
-  status("Conectado ao PC. Abrindo câmera...");
+  status("Conectado. Abrindo câmera...");
   iniciarCamera();
 };
 
 ws.onerror = () => {
-  status("Erro WebSocket (PC não conectou)");
+  status("Erro WebSocket");
 };
 
 ws.onmessage = e => {
-  const cor = JSON.parse(e.data).cor;
-  document.body.style.background = cor;
-  setTimeout(()=>document.body.style.background="black",300);
+  const data = JSON.parse(e.data);
+
+  if (data.type !== "scan") return;
+
+  if (data.cor === "green") piscar("green", 350);
+  else piscar("red", 1200);
 };
+
+function enviar(valor){
+  if (!valor) return;
+
+  ws.send(JSON.stringify({
+    type: "scan",
+    valor: valor,
+    rota: rota
+  }));
+}
+
+function enviarManual(){
+  const input = document.getElementById("manualInput");
+  const valor = input.value.trim();
+
+  if (!valor) return;
+
+  enviar(valor);
+  input.value = "";
+}
 
 function iniciarCamera(){
   if (typeof Html5Qrcode === "undefined") {
-    status("Erro: biblioteca não carregou");
+    status("Biblioteca da câmera não carregou");
     return;
   }
 
   Html5Qrcode.getCameras().then(cameras => {
-
     if (!cameras.length) {
       status("Nenhuma câmera encontrada");
       return;
     }
 
     const cameraId = cameras[cameras.length - 1].id;
-
     const qr = new Html5Qrcode("reader");
 
     qr.start(
@@ -80,16 +128,25 @@ function iniciarCamera(){
       { fps: 8, qrbox: { width: 250, height: 250 } },
       txt => {
         status("Lido: " + txt);
-        ws.send(JSON.stringify({type:"scan", valor:txt}));
+        enviar(txt);
       },
       err => {}
-    ).catch(err => {
+    ).then(() => {
+      status("Câmera aberta");
+    }).catch(err => {
       status("Erro câmera: " + err);
     });
 
   }).catch(err => {
     status("Permissão bloqueada: " + err);
   });
+}
+
+function piscar(cor, tempo){
+  document.body.style.background = cor;
+  setTimeout(() => {
+    document.body.style.background = "black";
+  }, tempo);
 }
 </script>
 
