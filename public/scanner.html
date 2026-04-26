@@ -11,38 +11,52 @@ body{
   color:lime;
   font-family:Arial;
 }
+
 #reader{
   width:100vw;
-  height:75vh;
+  height:70vh;
 }
+
 #manualArea{
   padding:10px;
 }
+
 input{
   width:100%;
-  box-sizing:border-box;
   padding:14px;
-  font-size:20px;
+  font-size:18px;
   background:#000;
   color:lime;
   border:2px solid lime;
   border-radius:10px;
 }
+
 button{
   width:100%;
   margin-top:8px;
   padding:14px;
-  font-size:20px;
+  font-size:18px;
   font-weight:bold;
   background:lime;
   color:black;
   border:0;
   border-radius:10px;
 }
+
 #status{
-  padding:8px;
+  margin-top:8px;
   font-size:14px;
   color:yellow;
+}
+
+#flash{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:transparent;
+  pointer-events:none;
 }
 </style>
 </head>
@@ -54,100 +68,122 @@ button{
 <div id="manualArea">
   <input id="manualInput" placeholder="Digitar ID manualmente">
   <button onclick="enviarManual()">ENVIAR</button>
-  <div id="status">Iniciando...</div>
+  <div id="status">Conectando...</div>
 </div>
+
+<div id="flash"></div>
 
 <script>
 const params = new URLSearchParams(location.search);
 const rota = params.get("rota") || "";
 
 const statusBox = document.getElementById("status");
+const flash = document.getElementById("flash");
 
-function status(msg){
-  statusBox.innerText = msg;
-}
+let ws;
+let ultimo = "";
+let tempo = 0;
 
-let protocolo = location.protocol === "https:" ? "wss://" : "ws://";
-let ws = new WebSocket(protocolo + location.host);
+// conexão
+function conectar(){
+  const protocolo = location.protocol === "https:" ? "wss://" : "ws://";
+  ws = new WebSocket(protocolo + location.host);
 
-ws.onopen = () => {
-  status("Conectado. Abrindo câmera...");
-  iniciarCamera();
-};
+  ws.onopen = () => {
+    status("Conectado ✔");
+    iniciarCamera();
+  };
 
-ws.onerror = () => {
-  status("Erro WebSocket");
-};
+  ws.onmessage = e => {
+    const data = JSON.parse(e.data);
 
-ws.onmessage = e => {
-  const data = JSON.parse(e.data);
+    if(data.type !== "feedback") return;
 
-  if (data.type !== "scan") return;
-
-  if (data.cor === "green") piscar("green", 350);
-  else piscar("red", 1200);
-};
-
-function enviar(valor){
-  if (!valor) return;
-
-  ws.send(JSON.stringify({
-    type: "scan",
-    valor: valor,
-    rota: rota
-  }));
-}
-
-function enviarManual(){
-  const input = document.getElementById("manualInput");
-  const valor = input.value.trim();
-
-  if (!valor) return;
-
-  enviar(valor);
-  input.value = "";
-}
-
-function iniciarCamera(){
-  if (typeof Html5Qrcode === "undefined") {
-    status("Biblioteca da câmera não carregou");
-    return;
-  }
-
-  Html5Qrcode.getCameras().then(cameras => {
-    if (!cameras.length) {
-      status("Nenhuma câmera encontrada");
-      return;
+    if(data.cor === "green"){
+      piscar("green",300);
+      vibrar(100);
     }
 
-    const cameraId = cameras[cameras.length - 1].id;
+    if(data.cor === "yellow"){
+      piscar("yellow",800);
+      vibrar([100,100,100]);
+    }
+
+    if(data.cor === "red"){
+      piscar("red",1500);
+      vibrar([200,100,200]);
+    }
+  };
+
+  ws.onclose = () => setTimeout(conectar,1000);
+}
+
+// câmera
+function iniciarCamera(){
+  Html5Qrcode.getCameras().then(cameras=>{
+    if(!cameras.length) return status("Sem câmera");
+
+    const cam = cameras[cameras.length-1].id;
     const qr = new Html5Qrcode("reader");
 
     qr.start(
-      cameraId,
-      { fps: 8, qrbox: { width: 250, height: 250 } },
-      txt => {
-        status("Lido: " + txt);
+      cam,
+      { fps:8, qrbox:{width:250,height:250} },
+      txt=>{
+        const agora = Date.now();
+
+        if(txt === ultimo && agora - tempo < 1500) return;
+
+        ultimo = txt;
+        tempo = agora;
+
         enviar(txt);
       },
-      err => {}
-    ).then(() => {
-      status("Câmera aberta");
-    }).catch(err => {
-      status("Erro câmera: " + err);
-    });
-
-  }).catch(err => {
-    status("Permissão bloqueada: " + err);
+      ()=>{}
+    );
   });
 }
 
-function piscar(cor, tempo){
-  document.body.style.background = cor;
-  setTimeout(() => {
-    document.body.style.background = "black";
-  }, tempo);
+// enviar
+function enviar(valor){
+  if(!valor) return;
+
+  ws.send(JSON.stringify({
+    type:"scan",
+    valor:valor,
+    rota:rota
+  }));
 }
+
+// manual
+function enviarManual(){
+  const input = document.getElementById("manualInput");
+  enviar(input.value.trim());
+  input.value="";
+}
+
+// feedback visual
+function piscar(cor,tempo){
+  flash.style.background =
+    cor==="green"?"rgba(0,255,0,.6)":
+    cor==="yellow"?"rgba(255,255,0,.7)":
+    "rgba(255,0,0,.7)";
+
+  setTimeout(()=>flash.style.background="transparent",tempo);
+}
+
+// vibração
+function vibrar(p){
+  if(navigator.vibrate){
+    navigator.vibrate(p);
+  }
+}
+
+function status(t){
+  statusBox.innerText = t;
+}
+
+conectar();
 </script>
 
 </body>
