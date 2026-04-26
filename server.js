@@ -6,31 +6,32 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// 🔥 IMPORTANTE (Render)
+const PORT = process.env.PORT || 3000;
+
+// Servir arquivos da pasta public
 app.use(express.static("public"));
 
-let rotas = {};
+// Quando celular envia leitura
+wss.on("connection", (ws) => {
+  ws.on("message", (msg) => {
+    try {
+      const data = JSON.parse(msg);
 
-function extrairCodigo(valor) {
-  const m = String(valor).match(/4\d{10}/);
-  return m ? m[0] : null;
-}
+      if (data.type === "scan") {
+        console.log("BIPADO:", data.valor);
 
-wss.on("connection", ws => {
-  ws.on("message", msg => {
-    const data = JSON.parse(msg);
+        // Aqui você pode validar rota depois
+        ws.send(JSON.stringify({ cor: "green" }));
+      }
 
-    if (data.type === "scan") {
-      const id = extrairCodigo(data.valor);
-      let cor = "red";
-
-      if (!id) cor = "red";
-      else cor = "green";
-
-      ws.send(JSON.stringify({ cor }));
+    } catch (e) {
+      console.log("Erro:", e);
     }
   });
 });
 
-server.listen(3000, "0.0.0.0", () => {
-  console.log("Rodando em http://localhost:3000");
+// Iniciar servidor
+server.listen(PORT, () => {
+  console.log("Rodando na porta:", PORT);
 });
