@@ -506,7 +506,8 @@ function conectarPainelPC() {
     console.log('📦 Bipagem recebida no PC:', data);
 
     let rota = data.rota || '';
-    const codigo = data.valorOriginal || data.id || '';
+    const codigo = data.valorOriginal || data.valor || data.id || '';
+    const socketId = data.socketId;
 
     if (!rota) {
       const select = byId('rotaSelecionada');
@@ -515,10 +516,20 @@ function conectarPainelPC() {
 
     if (!rota || !codigo) {
       console.warn('Sem rota ou sem código:', data);
+      enviarFeedbackCelular(socketId, 'red');
       return;
     }
 
-    processarBipagem(rota, codigo, true);
+    const resultado = processarBipagem(rota, codigo, true);
+
+    let cor = 'red';
+
+    if (resultado && resultado.status === 'VÁLIDO') cor = 'green';
+    if (resultado && resultado.status === 'DUPLICADO') cor = 'yellow';
+    if (resultado && resultado.status === 'FORA DE ROTA') cor = 'red';
+    if (resultado && resultado.status === 'INVÁLIDO') cor = 'red';
+
+    enviarFeedbackCelular(socketId, cor);
   };
 
   wsPainelPC.onerror = function(err) {
@@ -537,6 +548,17 @@ function conectarPainelPC() {
     }
     setTimeout(conectarPainelPC, 1000);
   };
+}
+
+function enviarFeedbackCelular(socketId, cor) {
+  if (!socketId) return;
+  if (!wsPainelPC || wsPainelPC.readyState !== WebSocket.OPEN) return;
+
+  wsPainelPC.send(JSON.stringify({
+    type: 'resultado',
+    socketId: socketId,
+    cor: cor
+  }));
 }
 
 function rodarTestesBasicos() {
