@@ -85,8 +85,7 @@ function byId(id) {
 }
 
 function extrairIds(texto) {
-  let textoLimpo = String(texto || '').replace(/<[^>]+>/g, " ");
-
+  const textoLimpo = String(texto || '').replace(/<[^>]+>/g, " ");
   const ids = new Set();
   let match;
 
