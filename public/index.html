@@ -348,7 +348,7 @@ function mostrarResultado(texto, cor) {
 
 function registrar(nomeRota, simbolo, status, id, operador = '') {
   const hora = new Date().toLocaleTimeString('pt-BR');
-  const linha = `${hora} | ${nomeRota} | ${simbolo} ${id} | ${status}`;
+ const linha = `${hora} | ${nomeRota} | ${operador} | ${simbolo} ${id} | ${status}`;
   const historico = byId('historico');
 
   if (historico) {
