@@ -290,7 +290,7 @@ function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel, operador = '
 
   if (!id) {
     if (mostrarNoPainel) mostrarResultado('❌ Inválido', 'red');
-    registrar(nomeRota, '❌', 'INVÁLIDO', valorOriginal);
+    registrar(nomeRota, '❌', 'INVÁLIDO', valorOriginal, operador);
     return { status: 'INVÁLIDO', id: valorOriginal };
   }
 
