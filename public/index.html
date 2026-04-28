@@ -298,7 +298,7 @@ function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel, operador = '
     rota.foraDeRota += 1;
     atualizar(nomeRota);
     if (mostrarNoPainel) mostrarResultado(`❌ Fora de rota: ${id}`, 'red');
-    registrar(nomeRota, '❌', 'FORA DE ROTA', id);
+    registrar(nomeRota, '❌', 'FORA DE ROTA', id, operador);
     return { status: 'FORA DE ROTA', id: id };
   }
 
