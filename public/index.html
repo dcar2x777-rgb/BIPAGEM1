@@ -85,12 +85,12 @@ function byId(id) {
 }
 
 function extrairIds(texto) {
-  const encontrados = String(texto || '').match(/4\d{10}/g) || [];
+  const encontrados = String(texto || '').match(/(?<!\d)4\d{10}(?!\d)/g) || [];
   return Array.from(new Set(encontrados));
 }
 
 function extrairCodigo(valor) {
-  const match = String(valor || '').match(/4\d{10}/);
+  const match = String(valor || '').match(/(?<!\d)4\d{10}(?!\d)/);
   return match ? match[0] : null;
 }
 
