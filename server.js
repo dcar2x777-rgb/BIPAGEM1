@@ -10,43 +10,38 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static("public"));
 
-// guarda conexões
+let nextId = 1;
+const clientes = new Map();
+
 wss.on("connection", (ws) => {
+  ws.clientId = String(nextId++);
+  clientes.set(ws.clientId, ws);
 
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
 
-      // mensagem do celular
       if (data.type === "scan") {
-
-        // manda pro PC (painel)
-        wss.clients.forEach(client => {
+        wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({
               type: "scan",
               valorOriginal: data.valor,
               rota: data.rota,
-              socketId: ws._socket.remotePort
+              socketId: ws.clientId
             }));
           }
         });
-
       }
 
-      // resposta do PC (validação)
       if (data.type === "resultado") {
-
-        // devolve só pro celular que enviou
-        wss.clients.forEach(client => {
-          if (client._socket.remotePort == data.socketId) {
-            client.send(JSON.stringify({
-              type: "feedback",
-              cor: data.cor
-            }));
-          }
-        });
-
+        const celular = clientes.get(String(data.socketId));
+        if (celular && celular.readyState === WebSocket.OPEN) {
+          celular.send(JSON.stringify({
+            type: "feedback",
+            cor: data.cor
+          }));
+        }
       }
 
     } catch (e) {
@@ -54,8 +49,11 @@ wss.on("connection", (ws) => {
     }
   });
 
+  ws.on("close", () => {
+    clientes.delete(ws.clientId);
+  });
 });
 
 server.listen(PORT, () => {
-  console.log("Rodando:", PORT);
+  console.log("Rodando na porta:", PORT);
 });
