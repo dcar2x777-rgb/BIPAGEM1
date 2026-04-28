@@ -311,7 +311,7 @@ function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel) {
   rota.bipados.add(id);
   atualizar(nomeRota);
   if (mostrarNoPainel) mostrarResultado(`✅ OK: ${id}`, 'green');
-  registrar(nomeRota, '✅', 'VÁLIDO', id);
+  registrar(nomeRota, '✅', 'VÁLIDO', id, data.operador);
   return { status: 'VÁLIDO', id: id };
 }
 
