@@ -11,7 +11,7 @@ body{margin:0;background:black;color:lime;font-family:Arial}
 input{width:100%;box-sizing:border-box;padding:14px;font-size:18px;background:#000;color:lime;border:2px solid lime;border-radius:10px}
 button{width:100%;margin-top:8px;padding:14px;font-size:18px;font-weight:bold;background:lime;color:black;border:0;border-radius:10px}
 #status,#ultimoId,#operadorBox{margin-top:8px;font-size:14px;color:yellow}
-#flash{position:fixed;top:0;left:0;width:100%;height:100%;background:transparent;pointer-events:none;z-index:999}
+#flash{position:fixed;inset:0;background:transparent;pointer-events:none;z-index:999}
 </style>
 </head>
 
@@ -61,29 +61,32 @@ function conectar(){
   };
 
   ws.onmessage = e => {
-    const data = JSON.parse(e.data);
+    let data;
+
+    try {
+      data = JSON.parse(e.data);
+    } catch {
+      return;
+    }
 
     if(data.type !== "feedback") return;
 
     if(data.cor === "green"){
-      piscar("green", 300);
-      vibrar(100);
+      feedback("green", 300, 100);
     }
 
     if(data.cor === "yellow"){
-      piscar("yellow", 1000);
-      vibrar([100,100,100]);
+      feedback("yellow", 1000, [100,100,100]);
     }
 
     if(data.cor === "red"){
-      piscar("red", 2000);
-      vibrar([200,100,200]);
+      feedback("red", 2000, [200,100,200]);
     }
   };
 
   ws.onclose = () => {
     status("Reconectando...");
-    setTimeout(conectar, 1000);
+    setTimeout(conectar,1000);
   };
 
   ws.onerror = () => {
@@ -93,23 +96,23 @@ function conectar(){
 
 function iniciarCamera(){
   if(typeof Html5Qrcode === "undefined"){
-    status("Biblioteca da câmera não carregou");
+    status("Biblioteca não carregou");
     return;
   }
 
-  Html5Qrcode.getCameras().then(cameras => {
+  Html5Qrcode.getCameras().then(cameras=>{
     if(!cameras.length){
       status("Sem câmera");
       return;
     }
 
-    const cam = cameras[cameras.length - 1].id;
+    const cam = cameras[cameras.length-1].id;
     const qr = new Html5Qrcode("reader");
 
     qr.start(
       cam,
-      { fps:8, qrbox:{width:250,height:250} },
-      txt => {
+      {fps:8, qrbox:{width:250,height:250}},
+      txt=>{
         if(bloqueado) return;
 
         const agora = Date.now();
@@ -121,13 +124,13 @@ function iniciarCamera(){
 
         enviar(txt);
       },
-      () => {}
-    ).then(() => {
+      ()=>{}
+    ).then(()=>{
       status("Câmera aberta");
-    }).catch(err => {
+    }).catch(err=>{
       status("Erro câmera: " + err);
     });
-  }).catch(err => {
+  }).catch(err=>{
     status("Permissão bloqueada: " + err);
   });
 }
@@ -141,12 +144,14 @@ function enviar(valor){
   }
 
   bloqueado = true;
-  setTimeout(() => {
+
+  setTimeout(()=>{
     bloqueado = false;
-  }, 2000);
+    status("Pronto para próxima leitura");
+  },2000);
 
   ultimoIdBox.innerText = "Último ID: " + valor;
-  status("Lido. Aguardando 2 segundos...");
+  status("Lido. Aguarde 2 segundos...");
 
   ws.send(JSON.stringify({
     type:"scan",
@@ -165,18 +170,27 @@ function enviarManual(){
   if(!valor) return;
 
   enviar(valor);
-  input.value = "";
+  input.value="";
 }
 
-function piscar(cor, tempoMs){
-  flash.style.background =
-    cor === "green" ? "rgba(0,255,0,.65)" :
-    cor === "yellow" ? "rgba(255,255,0,.75)" :
-    "rgba(255,0,0,.75)";
+function feedback(cor, tempoMs, vibracao){
+  if(cor === "green"){
+    flash.style.background = "rgba(0,255,0,.70)";
+  }
 
-  setTimeout(() => {
+  if(cor === "yellow"){
+    flash.style.background = "rgba(255,230,0,.85)";
+  }
+
+  if(cor === "red"){
+    flash.style.background = "rgba(255,0,0,.85)";
+  }
+
+  vibrar(vibracao);
+
+  setTimeout(()=>{
     flash.style.background = "transparent";
-  }, tempoMs);
+  },tempoMs);
 }
 
 function vibrar(padrao){
