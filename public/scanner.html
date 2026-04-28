@@ -5,61 +5,13 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-body{
-  margin:0;
-  background:black;
-  color:lime;
-  font-family:Arial;
-}
-
-#reader{
-  width:100vw;
-  height:70vh;
-}
-
-#manualArea{
-  padding:10px;
-}
-
-input{
-  width:100%;
-  box-sizing:border-box;
-  padding:14px;
-  font-size:18px;
-  background:#000;
-  color:lime;
-  border:2px solid lime;
-  border-radius:10px;
-}
-
-button{
-  width:100%;
-  margin-top:8px;
-  padding:14px;
-  font-size:18px;
-  font-weight:bold;
-  background:lime;
-  color:black;
-  border:0;
-  border-radius:10px;
-}
-
-#status{
-  margin-top:8px;
-  font-size:14px;
-  color:yellow;
-}
-
-#flash{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:transparent;
-  pointer-events:none;
-  z-index:999;
-}
+body{margin:0;background:black;color:lime;font-family:Arial}
+#reader{width:100vw;height:65vh}
+#manualArea{padding:10px}
+input{width:100%;box-sizing:border-box;padding:14px;font-size:18px;background:#000;color:lime;border:2px solid lime;border-radius:10px}
+button{width:100%;margin-top:8px;padding:14px;font-size:18px;font-weight:bold;background:lime;color:black;border:0;border-radius:10px}
+#status,#ultimoId,#operadorBox{margin-top:8px;font-size:14px;color:yellow}
+#flash{position:fixed;top:0;left:0;width:100%;height:100%;background:transparent;pointer-events:none;z-index:999}
 </style>
 </head>
 
@@ -70,6 +22,8 @@ button{
 <div id="manualArea">
   <input id="manualInput" placeholder="Digitar ID manualmente">
   <button onclick="enviarManual()">ENVIAR</button>
+  <div id="operadorBox"></div>
+  <div id="ultimoId">Último ID: nenhum</div>
   <div id="status">Conectando...</div>
 </div>
 
@@ -79,7 +33,17 @@ button{
 const params = new URLSearchParams(location.search);
 const rota = params.get("rota") || "";
 
+let operador = localStorage.getItem("operadorScanner");
+
+if(!operador){
+  operador = prompt("Nome de quem vai bipar:") || "OPERADOR";
+  localStorage.setItem("operadorScanner", operador);
+}
+
+document.getElementById("operadorBox").innerText = "Operador: " + operador;
+
 const statusBox = document.getElementById("status");
+const ultimoIdBox = document.getElementById("ultimoId");
 const flash = document.getElementById("flash");
 
 let ws;
@@ -87,7 +51,6 @@ let ultimo = "";
 let tempo = 0;
 let bloqueado = false;
 
-// conexão
 function conectar(){
   const protocolo = location.protocol === "https:" ? "wss://" : "ws://";
   ws = new WebSocket(protocolo + location.host);
@@ -108,23 +71,13 @@ function conectar(){
     }
 
     if(data.cor === "yellow"){
-      bloqueado = true;
       piscar("yellow", 1000);
       vibrar([100,100,100]);
-
-      setTimeout(() => {
-        bloqueado = false;
-      }, 1000);
     }
 
     if(data.cor === "red"){
-      bloqueado = true;
       piscar("red", 2000);
       vibrar([200,100,200]);
-
-      setTimeout(() => {
-        bloqueado = false;
-      }, 2000);
     }
   };
 
@@ -138,7 +91,6 @@ function conectar(){
   };
 }
 
-// câmera
 function iniciarCamera(){
   if(typeof Html5Qrcode === "undefined"){
     status("Biblioteca da câmera não carregou");
@@ -162,7 +114,7 @@ function iniciarCamera(){
 
         const agora = Date.now();
 
-        if(txt === ultimo && agora - tempo < 1500) return;
+        if(txt === ultimo && agora - tempo < 2000) return;
 
         ultimo = txt;
         tempo = agora;
@@ -180,7 +132,6 @@ function iniciarCamera(){
   });
 }
 
-// enviar leitura
 function enviar(valor){
   if(!valor) return;
 
@@ -189,14 +140,22 @@ function enviar(valor){
     return;
   }
 
+  bloqueado = true;
+  setTimeout(() => {
+    bloqueado = false;
+  }, 2000);
+
+  ultimoIdBox.innerText = "Último ID: " + valor;
+  status("Lido. Aguardando 2 segundos...");
+
   ws.send(JSON.stringify({
     type:"scan",
     valor:valor,
-    rota:rota
+    rota:rota,
+    operador:operador
   }));
 }
 
-// manual
 function enviarManual(){
   if(bloqueado) return;
 
@@ -209,7 +168,6 @@ function enviarManual(){
   input.value = "";
 }
 
-// feedback visual
 function piscar(cor, tempoMs){
   flash.style.background =
     cor === "green" ? "rgba(0,255,0,.65)" :
@@ -221,7 +179,6 @@ function piscar(cor, tempoMs){
   }, tempoMs);
 }
 
-// vibração
 function vibrar(padrao){
   if(navigator.vibrate){
     navigator.vibrate(padrao);
