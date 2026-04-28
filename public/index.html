@@ -85,30 +85,13 @@ function byId(id) {
 }
 
 function extrairIds(texto) {
-  let textoLimpo = String(texto || '').replace(/<[^>]+>/g, " ");
+  const encontrados = String(texto || '').match(/(?<!\d)4\d{10}(?!\d)/g) || [];
+  return Array.from(new Set(encontrados));
+}
 
-  const ids = new Set();
-  let match;
-
-  const regexCompleta = /"id":\s*(4\d{10})[\s\S]*?"receiver_id":\s*"([^"]+)"/g;
-
-  while ((match = regexCompleta.exec(textoLimpo)) !== null) {
-    const shipmentId = match[1];
-    const receiverId = match[2];
-
-    if (!receiverId.includes("_")) {
-      ids.add(shipmentId);
-    }
-  }
-
-  if (ids.size === 0) {
-    const regexSimples = /"id":\s*(4\d{10})/g;
-    while ((match = regexSimples.exec(textoLimpo)) !== null) {
-      ids.add(match[1]);
-    }
-  }
-
-  return Array.from(ids);
+function extrairCodigo(valor) {
+  const match = String(valor || '').match(/(?<!\d)4\d{10}(?!\d)/);
+  return match ? match[0] : null;
 }
 
 function safeId(nome) {
