@@ -28,6 +28,7 @@ wss.on("connection", (ws) => {
               type: "scan",
               valorOriginal: data.valor,
               rota: data.rota,
+              operador: data.operador || "",
               socketId: ws.clientId
             }));
           }
