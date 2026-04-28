@@ -269,7 +269,7 @@ function validarPacote() {
   if (resultado) limparCampo();
 }
 
-function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel) {
+function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel, operador = '') {
   if (!nomeRota) {
     alert('Selecione uma rota');
     return null;
@@ -348,7 +348,8 @@ function mostrarResultado(texto, cor) {
 
 function registrar(nomeRota, simbolo, status, id, operador = '') {
   const hora = new Date().toLocaleTimeString('pt-BR');
- const linha = `${hora} | ${nomeRota} | ${operador} | ${simbolo} ${id} | ${status}`;
+const nomeOperador = operador ? ` | ${operador}` : '';
+const linha = `${hora} | ${nomeRota}${nomeOperador} | ${simbolo} ${id} | ${status}`;
   const historico = byId('historico');
 
   if (historico) {
@@ -528,6 +529,7 @@ function conectarPainelPC() {
 
     let rota = data.rota || '';
     const codigo = data.valorOriginal || data.valor || data.id || '';
+    const operador = data.operador || '';
     const socketId = data.socketId;
 
     if (!rota) {
@@ -541,7 +543,7 @@ function conectarPainelPC() {
       return;
     }
 
-    const resultado = processarBipagem(rota, codigo, true);
+    const resultado = processarBipagem(rota, codigo, true, operador);
 
     let cor = 'red';
 
