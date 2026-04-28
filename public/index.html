@@ -346,7 +346,7 @@ function mostrarResultado(texto, cor) {
   box.textContent = texto;
 }
 
-function registrar(nomeRota, simbolo, status, id) {
+function registrar(nomeRota, simbolo, status, id, operador = '') {
   const hora = new Date().toLocaleTimeString('pt-BR');
   const linha = `${hora} | ${nomeRota} | ${simbolo} ${id} | ${status}`;
   const historico = byId('historico');
