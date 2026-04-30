@@ -633,6 +633,35 @@ function salvarDia() {
 window.addEventListener('DOMContentLoaded', function() {
   rodarTestesBasicos();
   conectarPainelPC();
+const data = byId('dataOperacao')?.value || new Date().toISOString().slice(0,10);
+byId('dataOperacao').value = data;
+const salvo = localStorage.getItem("bipagem_" + data);
+
+if (salvo) {
+  const pacote = JSON.parse(salvo);
+
+  rotas = {};
+
+  Object.keys(pacote.rotas).forEach(nome => {
+    rotas[nome] = {
+      nome: pacote.rotas[nome].nome,
+      ids: new Set(pacote.rotas[nome].ids),
+      bipados: new Set(pacote.rotas[nome].bipados),
+      foraDeRota: pacote.rotas[nome].foraDeRota,
+      historico: pacote.rotas[nome].historico || []
+    };
+
+    criarCardRota(nome);
+    adicionarSelectRota(nome);
+    atualizar(nome);
+
+    pacote.rotas[nome].historico.forEach(item => {
+      const linha = `${item.hora} | ${nome} | ${item.status} | ${item.id}`;
+      byId('historico').innerHTML =
+        `<div>${escapeHtml(linha)}</div>` + byId('historico').innerHTML;
+    });
+  });
+}
 });
 </script>
 </body>
