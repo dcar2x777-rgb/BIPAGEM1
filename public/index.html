@@ -600,7 +600,28 @@ function enviarFeedbackCelular(socketId, cor) {
   }));
 }
 
-function rodarTestesBasicos() {
+function salvarDia() {
+  const data = byId('dataOperacao')?.value || new Date().toISOString().slice(0,10);
+
+  const pacote = {
+    data: data,
+    rotas: {}
+  };
+
+  Object.keys(rotas).forEach(nome => {
+    pacote.rotas[nome] = {
+      nome: rotas[nome].nome,
+      ids: Array.from(rotas[nome].ids),
+      bipados: Array.from(rotas[nome].bipados),
+      foraDeRota: rotas[nome].foraDeRota,
+      historico: rotas[nome].historico
+    };
+  });
+
+  localStorage.setItem("bipagem_" + data, JSON.stringify(pacote));
+}
+  
+  function rodarTestesBasicos() {
   console.assert(extrairCodigo('ABC41234567890XYZ') === '41234567890', 'Teste extrairCodigo com texto');
   console.assert(extrairCodigo('12345678901') === null, 'Teste deve ignorar número que não começa com 4');
   console.assert(extrairIds('41234567890 41234567890 49876543210').length === 2, 'Teste extrairIds remove duplicados');
