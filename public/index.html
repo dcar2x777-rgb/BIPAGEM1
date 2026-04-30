@@ -29,6 +29,22 @@
         <input id="txtFiles" type="file" accept=".txt" multiple class="border border-green-500 bg-black text-green-300 rounded-xl p-3 w-full" />
         <button type="button" onclick="importarRotas()" class="bg-green-500 text-black px-6 py-3 rounded-xl font-bold">Importar Rotas</button>
       </div>
+      <div class="flex flex-col md:flex-row gap-4 items-start md:items-center mt-4">
+  <input id="dataOperacao" type="date" class="border border-green-500 bg-black text-green-300 rounded-xl p-3" />
+
+  <button type="button" onclick="carregarDiaSelecionado()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">
+    Carregar Dia
+  </button>
+
+  <button type="button" onclick="exportarBackupDia()" class="bg-white text-black px-6 py-3 rounded-xl font-bold">
+    Salvar Backup do Dia
+  </button>
+
+  <label class="border border-green-500 bg-black text-green-300 rounded-xl p-3 cursor-pointer">
+    Importar Backup JSON
+    <input type="file" accept=".json" onchange="importarBackupDia(event)" class="hidden">
+  </label>
+</div>
     </section>
 
     <section>
