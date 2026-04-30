@@ -620,8 +620,61 @@ function salvarDia() {
 
   localStorage.setItem("bipagem_" + data, JSON.stringify(pacote));
 }
-  
+
+  function exportarBackupDia() {
+  const data = byId('dataOperacao')?.value || new Date().toISOString().slice(0,10);
+
+  const dados = localStorage.getItem("bipagem_" + data);
+
+  if (!dados) {
+    alert("Nada salvo nesse dia");
+    return;
+  }
+
+  const blob = new Blob([dados], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "bipagem_" + data + ".json";
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+  function importarBackupDia(event) {
+  const file = event.target.files[0];
+
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    try {
+      const pacote = JSON.parse(e.target.result);
+
+      if (!pacote || !pacote.rotas) {
+        alert("Arquivo de backup inválido");
+        return;
+      }
+
+      if (pacote.data) {
+        byId('dataOperacao').value = pacote.data;
+      }
+
+      localStorage.setItem("bipagem_" + pacote.data, JSON.stringify(pacote));
+
+      alert("Backup importado com sucesso. Agora clique em Carregar Dia.");
+
+    } catch (erro) {
+      alert("Erro ao importar backup");
+      console.error(erro);
+    }
+  };
+
+  reader.readAsText(file);
+}
   function rodarTestesBasicos() {
+    
   console.assert(extrairCodigo('ABC41234567890XYZ') === '41234567890', 'Teste extrairCodigo com texto');
   console.assert(extrairCodigo('12345678901') === null, 'Teste deve ignorar número que não começa com 4');
   console.assert(extrairIds('41234567890 41234567890 49876543210').length === 2, 'Teste extrairIds remove duplicados');
