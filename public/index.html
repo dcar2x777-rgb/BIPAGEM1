@@ -175,6 +175,7 @@ function importarRotas() {
       rotas[nome] = criarObjetoRota(nome, ids);
       criarCardRota(nome);
       adicionarSelectRota(nome);
+      salvarDia();
     };
 
     reader.onerror = function() {
