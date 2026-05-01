@@ -30,20 +30,57 @@
         <button type="button" onclick="importarRotas()" class="bg-green-500 text-black px-6 py-3 rounded-xl font-bold">Importar Rotas</button>
       </div>
       <div class="flex flex-col md:flex-row gap-4 items-start md:items-center mt-4">
-  <input id="dataOperacao" type="date" class="border border-green-500 bg-black text-green-300 rounded-xl p-3" />
+  <div class="mt-4 border border-green-500 rounded-2xl p-4 bg-black">
+  <p class="text-green-400 font-bold mb-3">Calendário da Operação</p>
 
-  <button type="button" onclick="carregarDiaSelecionado()" class="bg-green-700 text-white px-6 py-3 rounded-xl font-bold">
-    Carregar Dia
-  </button>
+  <div class="flex flex-col md:flex-row gap-3 items-center">
+    <button
+      type="button"
+      onclick="mudarDia(-1)"
+      class="bg-green-900 text-green-300 px-5 py-3 rounded-xl font-bold border border-green-500"
+    >
+      ◀ Dia anterior
+    </button>
 
-  <button type="button" onclick="exportarBackupDia()" class="bg-white text-black px-6 py-3 rounded-xl font-bold">
-    Salvar Backup do Dia
-  </button>
+    <input
+      id="dataOperacao"
+      type="date"
+      onchange="carregarDiaSelecionado()"
+      class="border border-green-500 bg-black text-green-300 rounded-xl p-3 text-lg font-bold"
+    />
 
-  <label class="border border-green-500 bg-black text-green-300 rounded-xl p-3 cursor-pointer">
-    Importar Backup JSON
-    <input type="file" accept=".json" onchange="importarBackupDia(event)" class="hidden">
-  </label>
+    <button
+      type="button"
+      onclick="irParaHoje()"
+      class="bg-green-500 text-black px-5 py-3 rounded-xl font-bold"
+    >
+      Hoje
+    </button>
+
+    <button
+      type="button"
+      onclick="mudarDia(1)"
+      class="bg-green-900 text-green-300 px-5 py-3 rounded-xl font-bold border border-green-500"
+    >
+      Próximo dia ▶
+    </button>
+
+    <button
+      type="button"
+      onclick="exportarBackupDia()"
+      class="bg-white text-black px-5 py-3 rounded-xl font-bold"
+    >
+      Salvar Backup
+    </button>
+
+    <label class="border border-green-500 bg-black text-green-300 rounded-xl p-3 cursor-pointer font-bold">
+      Importar Backup
+      <input type="file" accept=".json" onchange="importarBackupDia(event)" class="hidden">
+    </label>
+  </div>
+
+  <div id="dataBonita" class="mt-3 text-yellow-400 font-bold"></div>
+</div>
 </div>
     </section>
 
@@ -721,6 +758,53 @@ function salvarDia() {
 
   mostrarResultado("Dia carregado com sucesso.", "green");
 } 
+function atualizarDataBonita() {
+  const campo = byId('dataOperacao');
+  const box = byId('dataBonita');
+  if (!campo || !box || !campo.value) return;
+
+  const partes = campo.value.split('-');
+  const data = new Date(partes[0], partes[1] - 1, partes[2]);
+
+  box.textContent = data.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+function mudarDia(dias) {
+  const campo = byId('dataOperacao');
+  if (!campo.value) campo.value = new Date().toISOString().slice(0,10);
+
+  const partes = campo.value.split('-');
+  const data = new Date(partes[0], partes[1] - 1, partes[2]);
+
+  data.setDate(data.getDate() + dias);
+
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+
+  campo.value = `${ano}-${mes}-${dia}`;
+
+  atualizarDataBonita();
+  carregarDiaSelecionado();
+}
+
+function irParaHoje() {
+  const hoje = new Date();
+
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoje.getDate()).padStart(2, '0');
+
+  byId('dataOperacao').value = `${ano}-${mes}-${dia}`;
+
+  atualizarDataBonita();
+  carregarDiaSelecionado();
+}
   function rodarTestesBasicos() {
     
   console.assert(extrairCodigo('ABC41234567890XYZ') === '41234567890', 'Teste extrairCodigo com texto');
