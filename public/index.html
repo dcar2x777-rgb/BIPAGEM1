@@ -678,6 +678,49 @@ function salvarDia() {
 
   reader.readAsText(file);
 }
+ 
+ function carregarDiaSelecionado() {
+  const data = byId('dataOperacao')?.value || new Date().toISOString().slice(0,10);
+  const salvo = localStorage.getItem("bipagem_" + data);
+
+  byId('rotasContainer').innerHTML = '';
+  byId('rotaSelecionada').innerHTML = '<option value="">Selecione uma rota</option>';
+  byId('historico').innerHTML = '';
+
+  if (!salvo) {
+    rotas = {};
+    mostrarResultado("Nenhum dado salvo nesse dia.", "normal");
+    return;
+  }
+
+  const pacote = JSON.parse(salvo);
+  rotas = {};
+
+  Object.keys(pacote.rotas).forEach(nome => {
+    rotas[nome] = {
+      nome: pacote.rotas[nome].nome,
+      ids: new Set(pacote.rotas[nome].ids),
+      bipados: new Set(pacote.rotas[nome].bipados),
+      foraDeRota: pacote.rotas[nome].foraDeRota,
+      historico: pacote.rotas[nome].historico || []
+    };
+
+    criarCardRota(nome);
+    adicionarSelectRota(nome);
+    atualizar(nome);
+
+    rotas[nome].historico.forEach(item => {
+      const nomeOperador = item.operador ? ` | ${item.operador}` : '';
+      const simbolo = item.simbolo || '';
+      const linha = `${item.hora} | ${nome}${nomeOperador} | ${simbolo} ${item.id} | ${item.status}`;
+
+      byId('historico').innerHTML =
+        `<div>${escapeHtml(linha)}</div>` + byId('historico').innerHTML;
+    });
+  });
+
+  mostrarResultado("Dia carregado com sucesso.", "green");
+} 
   function rodarTestesBasicos() {
     
   console.assert(extrairCodigo('ABC41234567890XYZ') === '41234567890', 'Teste extrairCodigo com texto');
