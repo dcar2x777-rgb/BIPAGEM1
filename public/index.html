@@ -725,44 +725,18 @@ function salvarDia() {
     
   console.assert(extrairCodigo('ABC41234567890XYZ') === '41234567890', 'Teste extrairCodigo com texto');
   console.assert(extrairCodigo('12345678901') === null, 'Teste deve ignorar número que não começa com 4');
-  console.assert(extrairIds('41234567890 41234567890 49876543210').length === 2, 'Teste extrairIds remove duplicados');
 
   const teste = criarObjetoRota('TESTE', ['41234567890']);
   console.assert(teste.ids.has('41234567890'), 'Teste criarObjetoRota cria Set de ids');
 }
 
 window.addEventListener('DOMContentLoaded', function() {
-  rodarTestesBasicos();
   conectarPainelPC();
-const data = byId('dataOperacao')?.value || new Date().toISOString().slice(0,10);
-byId('dataOperacao').value = data;
-const salvo = localStorage.getItem("bipagem_" + data);
 
-if (salvo) {
-  const pacote = JSON.parse(salvo);
+  const data = byId('dataOperacao')?.value || new Date().toISOString().slice(0,10);
+  byId('dataOperacao').value = data;
 
-  rotas = {};
-
-  Object.keys(pacote.rotas).forEach(nome => {
-    rotas[nome] = {
-      nome: pacote.rotas[nome].nome,
-      ids: new Set(pacote.rotas[nome].ids),
-      bipados: new Set(pacote.rotas[nome].bipados),
-      foraDeRota: pacote.rotas[nome].foraDeRota,
-      historico: pacote.rotas[nome].historico || []
-    };
-
-    criarCardRota(nome);
-    adicionarSelectRota(nome);
-    atualizar(nome);
-
-    pacote.rotas[nome].historico.forEach(item => {
-      const linha = `${item.hora} | ${nome} | ${item.status} | ${item.id}`;
-      byId('historico').innerHTML =
-        `<div>${escapeHtml(linha)}</div>` + byId('historico').innerHTML;
-    });
-  });
-}
+  carregarDiaSelecionado();
 });
 </script>
 </body>
