@@ -308,6 +308,7 @@ function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel, operador = '
   if (!id) {
     if (mostrarNoPainel) mostrarResultado('❌ Inválido', 'red');
     registrar(nomeRota, '❌', 'INVÁLIDO', valorOriginal, operador);
+    salvarDia();
     return { status: 'INVÁLIDO', id: valorOriginal };
   }
 
@@ -316,12 +317,14 @@ function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel, operador = '
     atualizar(nomeRota);
     if (mostrarNoPainel) mostrarResultado(`❌ Fora de rota: ${id}`, 'red');
     registrar(nomeRota, '❌', 'FORA DE ROTA', id, operador);
+    salvarDia();
     return { status: 'FORA DE ROTA', id: id };
   }
 
   if (rota.bipados.has(id)) {
     if (mostrarNoPainel) mostrarResultado(`⚠ Duplicado: ${id}`, 'yellow');
     registrar(nomeRota, '⚠', 'DUPLICADO', id);
+    salvarDia();
     return { status: 'DUPLICADO', id: id };
   }
 
@@ -329,6 +332,7 @@ function processarBipagem(nomeRota, valorOriginal, mostrarNoPainel, operador = '
   atualizar(nomeRota);
   if (mostrarNoPainel) mostrarResultado(`✅ OK: ${id}`, 'green');
   registrar(nomeRota, '✅', 'VÁLIDO', id);
+  salvarDia();
   return { status: 'VÁLIDO', id: id };
 }
 
