@@ -816,6 +816,53 @@ function irParaHoje() {
   atualizarDataBonita();
   carregarDiaSelecionado();
 }
+  function exportarValidosPorRota() {
+  let totalArquivos = 0;
+
+  Object.keys(rotas).forEach(nomeRota => {
+    const rota = rotas[nomeRota];
+    if (!rota) return;
+
+    const validos = (rota.historico || []).filter(item => item.status === 'VÁLIDO');
+
+    if (!validos.length) return;
+
+    const now = new Date();
+    const linhas = ['date,time,time_zone,format,text,notes,favorite,date_utc,time_utc,metadata'];
+
+    validos.forEach((item, i) => {
+      const t = new Date(now.getTime() + i * 1000);
+      const date = t.toISOString().slice(0, 10);
+      const time = t.toTimeString().slice(0, 8);
+      const utc = new Date(t.getTime() + 3 * 3600000);
+      const dateUtc = utc.toISOString().slice(0, 10);
+      const timeUtc = utc.toTimeString().slice(0, 8);
+      const codigo = String(item.id).replace(/"/g, '""');
+      const format = String(item.id).startsWith('{') ? 'QR_CODE' : 'CODE_128';
+
+      linhas.push(`${date},${time},-03:00,${format},"${codigo}",,false,${dateUtc},${timeUtc},`);
+    });
+
+    const csv = linhas.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeId(nomeRota)}_validos.csv`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    totalArquivos++;
+  });
+
+  if (totalArquivos === 0) {
+    alert('Nenhum ID válido bipado ainda.');
+  }
+}
   function rodarTestesBasicos() {
     
   console.assert(extrairCodigo('ABC41234567890XYZ') === '41234567890', 'Teste extrairCodigo com texto');
