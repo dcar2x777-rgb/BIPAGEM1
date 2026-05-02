@@ -825,7 +825,6 @@ function irParaHoje() {
 
     const validos = (rota.historico || []).filter(item => item.status === 'VÁLIDO');
 
-    if (!validos.length) return;
 
     const now = new Date();
     const linhas = ['date,time,time_zone,format,text,notes,favorite,date_utc,time_utc,metadata'];
