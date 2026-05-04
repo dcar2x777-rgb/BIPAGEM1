@@ -13,22 +13,19 @@ html,body{
   font-family:Arial;
   min-height:100%;
 }
-
 #reader{
   width:100vw;
-  height:55vh;
+  height:58vh;
   background:black;
   border:5px solid #111;
   box-sizing:border-box;
 }
-
 #manualArea{
   padding:10px;
   box-sizing:border-box;
   background:black;
   border-top:2px solid lime;
 }
-
 input{
   width:100%;
   box-sizing:border-box;
@@ -39,7 +36,6 @@ input{
   border:2px solid lime;
   border-radius:10px;
 }
-
 button{
   width:100%;
   margin-top:8px;
@@ -51,13 +47,11 @@ button{
   border:0;
   border-radius:10px;
 }
-
-#status,#ultimoId,#operadorBox,#rotaBox{
+#status,#ultimoId,#operadorBox,#rotaBox,#modoBox{
   margin-top:7px;
   font-size:14px;
   color:yellow;
 }
-
 #badgeLeitura{
   display:none;
   position:fixed;
@@ -73,7 +67,6 @@ button{
   font-weight:bold;
   box-shadow:0 0 20px lime;
 }
-
 #flash{
   position:fixed;
   inset:0;
@@ -81,7 +74,6 @@ button{
   pointer-events:none;
   z-index:999;
 }
-
 #btnRetomar{
   display:none;
   position:fixed;
@@ -106,9 +98,11 @@ button{
 <div id="manualArea">
   <input id="manualInput" placeholder="Digitar ID manualmente">
   <button onclick="enviarManual()">ENVIAR</button>
+  <button onclick="pausarCamera()">⏸ PAUSAR SCANNER</button>
 
   <div id="rotaBox"></div>
   <div id="operadorBox"></div>
+  <div id="modoBox"></div>
   <div id="ultimoId">Último ID: nenhum</div>
   <div id="status">Conectando...</div>
 </div>
@@ -137,21 +131,51 @@ const flash = document.getElementById("flash");
 const readerBox = document.getElementById("reader");
 const badgeLeitura = document.getElementById("badgeLeitura");
 const btnRetomar = document.getElementById("btnRetomar");
+const modoBox = document.getElementById("modoBox");
 
 let ws;
 let qr;
 let ultimo = "";
 let tempo = 0;
 let bloqueado = false;
-
 let ultimaBipagem = Date.now();
 let cameraAtiva = false;
 
-const configScanner = {
-  fps: 18,
-  aspectRatio: 1.777,
-  disableFlip: false
-};
+/* CONFIGURAÇÃO AUTOMÁTICA POR APARELHO */
+const ua = navigator.userAgent;
+const isIOS = /iPhone|iPad|iPod/i.test(ua);
+const cpu = navigator.hardwareConcurrency || 4;
+
+let configScanner;
+let modoScanner = "";
+
+if(isIOS){
+  modoScanner = "Modo iPhone: leitura forte";
+  configScanner = {
+    fps: 25,
+    qrbox: { width: 320, height: 320 },
+    aspectRatio: 1.333,
+    disableFlip: false
+  };
+}else if(cpu >= 8){
+  modoScanner = "Modo Android forte";
+  configScanner = {
+    fps: 18,
+    qrbox: { width: 360, height: 260 },
+    aspectRatio: 1.777,
+    disableFlip: false
+  };
+}else{
+  modoScanner = "Modo Android econômico";
+  configScanner = {
+    fps: 14,
+    qrbox: { width: 320, height: 230 },
+    aspectRatio: 1.777,
+    disableFlip: false
+  };
+}
+
+modoBox.innerText = modoScanner;
 
 function conectar(){
   const protocolo = location.protocol === "https:" ? "wss://" : "ws://";
@@ -244,11 +268,11 @@ function pausarCamera(){
     cameraAtiva = false;
     bloqueado = false;
     btnRetomar.style.display = "block";
-    status("Modo economia ativo. Toque em RETOMAR.");
+    status("Scanner pausado. Toque em RETOMAR.");
   }).catch(()=>{
     cameraAtiva = false;
     btnRetomar.style.display = "block";
-    status("Modo economia ativo.");
+    status("Scanner pausado.");
   });
 }
 
@@ -259,6 +283,7 @@ function retomarCamera(){
   iniciarCamera();
 }
 
+/* ULTRA ECONOMIA: 15s SEM BIPAR PAUSA A CÂMERA */
 setInterval(() => {
   if(!cameraAtiva) return;
 
@@ -268,6 +293,13 @@ setInterval(() => {
     pausarCamera();
   }
 }, 2000);
+
+/* SE SAIR DA ABA, PAUSA CÂMERA */
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden){
+    pausarCamera();
+  }
+});
 
 function enviar(valor){
   if(!valor) return;
@@ -324,7 +356,7 @@ function feedback(cor, tempoCor, tempoBloqueio, textoStatus){
 
   if(cor === "red"){
     readerBox.style.borderColor = "red";
-    flash.style.background = "rgba(255,0,0,.65)";
+    flash.style.background = "rgba(255,0,0,.70)";
     vibrarForte();
     tocarSomErro();
   }
