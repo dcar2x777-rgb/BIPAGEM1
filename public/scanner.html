@@ -12,20 +12,24 @@ html,body{
   color:lime;
   font-family:Arial;
   min-height:100%;
+  overflow:auto;
 }
+
 #reader{
   width:100vw;
-  height:58vh;
+  height:42vh;
   background:black;
   border:5px solid #111;
   box-sizing:border-box;
 }
+
 #manualArea{
   padding:10px;
   box-sizing:border-box;
   background:black;
   border-top:2px solid lime;
 }
+
 input{
   width:100%;
   box-sizing:border-box;
@@ -36,6 +40,7 @@ input{
   border:2px solid lime;
   border-radius:10px;
 }
+
 button{
   width:100%;
   margin-top:8px;
@@ -47,11 +52,13 @@ button{
   border:0;
   border-radius:10px;
 }
+
 #status,#ultimoId,#operadorBox,#rotaBox,#modoBox{
   margin-top:7px;
   font-size:14px;
   color:yellow;
 }
+
 #badgeLeitura{
   display:none;
   position:fixed;
@@ -67,6 +74,7 @@ button{
   font-weight:bold;
   box-shadow:0 0 20px lime;
 }
+
 #flash{
   position:fixed;
   inset:0;
@@ -74,6 +82,7 @@ button{
   pointer-events:none;
   z-index:999;
 }
+
 #btnRetomar{
   display:none;
   position:fixed;
@@ -141,7 +150,6 @@ let bloqueado = false;
 let ultimaBipagem = Date.now();
 let cameraAtiva = false;
 
-/* CONFIGURAÇÃO AUTOMÁTICA POR APARELHO */
 const ua = navigator.userAgent;
 const isIOS = /iPhone|iPad|iPod/i.test(ua);
 const cpu = navigator.hardwareConcurrency || 4;
@@ -161,7 +169,6 @@ if(isIOS){
   modoScanner = "Modo Android forte";
   configScanner = {
     fps: 18,
-    qrbox: { width: 360, height: 260 },
     aspectRatio: 1.777,
     disableFlip: false
   };
@@ -169,7 +176,6 @@ if(isIOS){
   modoScanner = "Modo Android econômico";
   configScanner = {
     fps: 14,
-    qrbox: { width: 320, height: 230 },
     aspectRatio: 1.777,
     disableFlip: false
   };
@@ -283,7 +289,6 @@ function retomarCamera(){
   iniciarCamera();
 }
 
-/* ULTRA ECONOMIA: 15s SEM BIPAR PAUSA A CÂMERA */
 setInterval(() => {
   if(!cameraAtiva) return;
 
@@ -294,7 +299,6 @@ setInterval(() => {
   }
 }, 2000);
 
-/* SE SAIR DA ABA, PAUSA CÂMERA */
 document.addEventListener("visibilitychange", () => {
   if(document.hidden){
     pausarCamera();
