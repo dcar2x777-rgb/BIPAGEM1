@@ -12,6 +12,20 @@ input{width:100%;box-sizing:border-box;padding:14px;font-size:18px;background:#0
 button{width:100%;margin-top:8px;padding:14px;font-size:18px;font-weight:bold;background:lime;color:black;border:0;border-radius:10px}
 #status,#ultimoId,#operadorBox,#rotaBox{margin-top:7px;font-size:14px;color:yellow}
 #flash{position:fixed;inset:0;background:transparent;pointer-events:none;z-index:999}
+#btnRetomar{
+  display:none;
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:1000;
+  width:90%;
+  max-width:400px;
+  background:#00ff00;
+  color:#000;
+  border:3px solid #fff;
+  box-shadow:0 0 20px lime;
+}
 </style>
 </head>
 
@@ -27,6 +41,8 @@ button{width:100%;margin-top:8px;padding:14px;font-size:18px;font-weight:bold;ba
   <div id="ultimoId">Último ID: nenhum</div>
   <div id="status">Conectando...</div>
 </div>
+
+<button id="btnRetomar" onclick="retomarCamera()">▶ RETOMAR SCANNER</button>
 
 <div id="flash"></div>
 
@@ -47,12 +63,23 @@ document.getElementById("operadorBox").innerText = "Operador: " + operador;
 const statusBox = document.getElementById("status");
 const ultimoIdBox = document.getElementById("ultimoId");
 const flash = document.getElementById("flash");
+const btnRetomar = document.getElementById("btnRetomar");
 
 let ws;
 let qr;
 let ultimo = "";
 let tempo = 0;
 let bloqueado = false;
+
+let ultimaBipagem = Date.now();
+let cameraAtiva = false;
+
+const configScanner = {
+  fps: 18,
+  qrbox: { width: 360, height: 260 },
+  aspectRatio: 1.777,
+  disableFlip: false
+};
 
 function conectar(){
   const protocolo = location.protocol === "https:" ? "wss://" : "ws://";
@@ -83,7 +110,7 @@ function conectar(){
     }
 
     if(data.cor === "red"){
-      feedback("red", 2000, [400,150,400,150,600], 2000, "Fora de rota / inválido ✖");
+      feedback("red", 2000, [600,100,600,100,800], 2000, "Fora de rota / inválido ✖");
     }
   };
 
@@ -98,23 +125,23 @@ function conectar(){
 }
 
 function iniciarCamera(){
+  if(cameraAtiva) return;
+
   if(typeof Html5Qrcode === "undefined"){
     status("Biblioteca da câmera não carregou");
     return;
   }
 
-  qr = new Html5Qrcode("reader");
+  if(!qr){
+    qr = new Html5Qrcode("reader");
+  }
 
   qr.start(
     { facingMode: "environment" },
-    {
-      fps: 18,
-      qrbox: { width: 360, height: 260 },
-      aspectRatio: 1.777,
-      disableFlip: false
-    },
+    configScanner,
     txt => {
       if(bloqueado) return;
+      if(!cameraAtiva) return;
 
       const agora = Date.now();
 
@@ -122,16 +149,53 @@ function iniciarCamera(){
 
       ultimo = txt;
       tempo = agora;
+      ultimaBipagem = Date.now();
 
       enviar(txt);
     },
     () => {}
   ).then(()=>{
+    cameraAtiva = true;
+    btnRetomar.style.display = "none";
+    ultimaBipagem = Date.now();
     status("Câmera aberta");
   }).catch(err=>{
     status("Erro câmera: " + err);
   });
 }
+
+function pausarCamera(){
+  if(!cameraAtiva) return;
+  if(!qr) return;
+
+  qr.stop().then(()=>{
+    cameraAtiva = false;
+    bloqueado = false;
+    btnRetomar.style.display = "block";
+    status("Modo economia ativo. Toque em RETOMAR.");
+  }).catch(()=>{
+    cameraAtiva = false;
+    btnRetomar.style.display = "block";
+    status("Modo economia ativo.");
+  });
+}
+
+function retomarCamera(){
+  btnRetomar.style.display = "none";
+  ultimaBipagem = Date.now();
+  status("Retomando câmera...");
+  iniciarCamera();
+}
+
+setInterval(() => {
+  if(!cameraAtiva) return;
+
+  const parado = Date.now() - ultimaBipagem;
+
+  if(parado > 15000){
+    pausarCamera();
+  }
+}, 2000);
 
 function enviar(valor){
   if(!valor) return;
@@ -166,12 +230,14 @@ function enviarManual(){
 
   if(!valor) return;
 
+  ultimaBipagem = Date.now();
   enviar(valor);
   input.value="";
 }
 
 function feedback(cor, tempoCor, vibracao, tempoBloqueio, textoStatus){
   bloqueado = true;
+  ultimaBipagem = Date.now();
 
   if(cor === "green"){
     flash.style.background = "rgba(0,255,0,.70)";
@@ -182,7 +248,8 @@ function feedback(cor, tempoCor, vibracao, tempoBloqueio, textoStatus){
   }
 
   if(cor === "red"){
-    flash.style.background = "rgba(255,0,0,.90)";
+    flash.style.background = "rgba(255,0,0,.95)";
+    tocarSomErro();
   }
 
   status(textoStatus);
@@ -196,6 +263,28 @@ function feedback(cor, tempoCor, vibracao, tempoBloqueio, textoStatus){
     bloqueado = false;
     status("Pronto para próxima leitura");
   },tempoBloqueio);
+}
+
+function tocarSomErro(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.frequency.value = 300;
+    osc.type = "square";
+    gain.gain.value = 0.35;
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+
+    setTimeout(()=>{
+      osc.stop();
+      ctx.close();
+    },450);
+  }catch(e){}
 }
 
 function vibrar(padrao){
