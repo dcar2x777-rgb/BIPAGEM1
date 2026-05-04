@@ -5,20 +5,90 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-body{margin:0;background:black;color:lime;font-family:Arial;overflow:hidden}
-#reader{width:100vw;height:65vh;background:black}
-#manualArea{height:35vh;padding:10px;box-sizing:border-box;border-top:2px solid lime}
-input{width:100%;box-sizing:border-box;padding:14px;font-size:18px;background:#000;color:lime;border:2px solid lime;border-radius:10px}
-button{width:100%;margin-top:8px;padding:14px;font-size:18px;font-weight:bold;background:lime;color:black;border:0;border-radius:10px}
-#status,#ultimoId,#operadorBox,#rotaBox{margin-top:7px;font-size:14px;color:yellow}
-#flash{position:fixed;inset:0;background:transparent;pointer-events:none;z-index:999}
+html,body{
+  margin:0;
+  padding:0;
+  background:black;
+  color:lime;
+  font-family:Arial;
+  min-height:100%;
+}
+
+#reader{
+  width:100vw;
+  height:55vh;
+  background:black;
+  border:5px solid #111;
+  box-sizing:border-box;
+}
+
+#manualArea{
+  padding:10px;
+  box-sizing:border-box;
+  background:black;
+  border-top:2px solid lime;
+}
+
+input{
+  width:100%;
+  box-sizing:border-box;
+  padding:14px;
+  font-size:18px;
+  background:#000;
+  color:lime;
+  border:2px solid lime;
+  border-radius:10px;
+}
+
+button{
+  width:100%;
+  margin-top:8px;
+  padding:14px;
+  font-size:18px;
+  font-weight:bold;
+  background:lime;
+  color:black;
+  border:0;
+  border-radius:10px;
+}
+
+#status,#ultimoId,#operadorBox,#rotaBox{
+  margin-top:7px;
+  font-size:14px;
+  color:yellow;
+}
+
+#badgeLeitura{
+  display:none;
+  position:fixed;
+  top:15px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:1001;
+  background:lime;
+  color:black;
+  padding:12px 20px;
+  border-radius:14px;
+  font-size:18px;
+  font-weight:bold;
+  box-shadow:0 0 20px lime;
+}
+
+#flash{
+  position:fixed;
+  inset:0;
+  background:transparent;
+  pointer-events:none;
+  z-index:999;
+}
+
 #btnRetomar{
   display:none;
   position:fixed;
   bottom:20px;
   left:50%;
   transform:translateX(-50%);
-  z-index:1000;
+  z-index:1002;
   width:90%;
   max-width:400px;
   background:#00ff00;
@@ -36,14 +106,15 @@ button{width:100%;margin-top:8px;padding:14px;font-size:18px;font-weight:bold;ba
 <div id="manualArea">
   <input id="manualInput" placeholder="Digitar ID manualmente">
   <button onclick="enviarManual()">ENVIAR</button>
+
   <div id="rotaBox"></div>
   <div id="operadorBox"></div>
   <div id="ultimoId">Último ID: nenhum</div>
   <div id="status">Conectando...</div>
 </div>
 
+<div id="badgeLeitura">📦 Código bipado</div>
 <button id="btnRetomar" onclick="retomarCamera()">▶ RETOMAR SCANNER</button>
-
 <div id="flash"></div>
 
 <script>
@@ -63,6 +134,8 @@ document.getElementById("operadorBox").innerText = "Operador: " + operador;
 const statusBox = document.getElementById("status");
 const ultimoIdBox = document.getElementById("ultimoId");
 const flash = document.getElementById("flash");
+const readerBox = document.getElementById("reader");
+const badgeLeitura = document.getElementById("badgeLeitura");
 const btnRetomar = document.getElementById("btnRetomar");
 
 let ws;
@@ -76,7 +149,6 @@ let cameraAtiva = false;
 
 const configScanner = {
   fps: 18,
-  qrbox: { width: 360, height: 260 },
   aspectRatio: 1.777,
   disableFlip: false
 };
@@ -102,15 +174,15 @@ function conectar(){
     if(data.type !== "feedback") return;
 
     if(data.cor === "green"){
-      feedback("green", 350, 100, 600, "OK ✔");
+      feedback("green", 350, 600, "OK ✔");
     }
 
     if(data.cor === "yellow"){
-      feedback("yellow", 1000, [100,100,100], 1000, "Duplicado ⚠");
+      feedback("yellow", 1000, 1000, "Duplicado ⚠");
     }
 
     if(data.cor === "red"){
-      feedback("red", 2000, [600,100,600,100,800], 2000, "Fora de rota / inválido ✖");
+      feedback("red", 2000, 2000, "Fora de rota / inválido ✖");
     }
   };
 
@@ -213,6 +285,7 @@ function enviar(valor){
 
   ultimoIdBox.innerText = "Último ID: " + valor;
   status("Lido. Validando...");
+  mostrarBadge();
 
   ws.send(JSON.stringify({
     type:"scan",
@@ -235,34 +308,46 @@ function enviarManual(){
   input.value="";
 }
 
-function feedback(cor, tempoCor, vibracao, tempoBloqueio, textoStatus){
+function feedback(cor, tempoCor, tempoBloqueio, textoStatus){
   bloqueado = true;
   ultimaBipagem = Date.now();
 
   if(cor === "green"){
-    flash.style.background = "rgba(0,255,0,.70)";
+    readerBox.style.borderColor = "lime";
+    flash.style.background = "rgba(0,255,0,.25)";
   }
 
   if(cor === "yellow"){
-    flash.style.background = "rgba(255,230,0,.85)";
+    readerBox.style.borderColor = "yellow";
+    flash.style.background = "rgba(255,230,0,.35)";
   }
 
   if(cor === "red"){
-    flash.style.background = "rgba(255,0,0,.95)";
+    readerBox.style.borderColor = "red";
+    flash.style.background = "rgba(255,0,0,.65)";
+    vibrarForte();
     tocarSomErro();
   }
 
   status(textoStatus);
-  vibrar(vibracao);
 
   setTimeout(()=>{
     flash.style.background = "transparent";
+    readerBox.style.borderColor = "#111";
   },tempoCor);
 
   setTimeout(()=>{
     bloqueado = false;
     status("Pronto para próxima leitura");
   },tempoBloqueio);
+}
+
+function mostrarBadge(){
+  badgeLeitura.style.display = "block";
+
+  setTimeout(()=>{
+    badgeLeitura.style.display = "none";
+  },700);
 }
 
 function tocarSomErro(){
@@ -287,9 +372,9 @@ function tocarSomErro(){
   }catch(e){}
 }
 
-function vibrar(padrao){
+function vibrarForte(){
   if(navigator.vibrate){
-    navigator.vibrate(padrao);
+    navigator.vibrate([600,100,600,100,800]);
   }
 }
 
